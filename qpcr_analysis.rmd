@@ -2,12 +2,64 @@
 title: "qPCR Analysis"
 output: html_notebook
 ---
+```{r}
+library(tidyverse)
+library(readxl)
+```
 
 # Ingest data
 
+The qPCR machine outputs its data in excel files.
+For this experiment, we can find the files [in our lab google drive](https://drive.google.com/drive/folders/1W7bcgLTdgLp2NX2_Yl3J17dTZ71Bi6Ib).
+Eventually, we might want to automate access to the data, but for now, we'll manually download Plates 1, 2, and 3 excel files and save to the data directory.
+
 ## Read qPCR data from excel files
 
-## Asign experimental labels to wells
+For each plate, we'll read the "Results" sheet.
+The first 42 rows of the sheet are metadata that we don't need, so we'll skip them.
+
+```{r}
+experiment_1 <- read_excel(
+  path = "data/Plate 1.xls",
+  sheet = "Results",
+  skip = 42
+)
+
+glimpse(experiment_1)
+```
+
+## Tidy the data
+
+We're only going to keep a subset of columns:
+
+* `CT`: the Ct value. Either "Undetermined" or a number. We'll use `as.numeric` to convert from a character string to a number (double).
+* `Sample Name` labels the content of the samples
+* `Well Position` is the alphanumeric plate well ID (e.g., "A01"). Note: this is redundant with `Sample Name` here, but in the future we may want to automatically label the samples from `Well Position` using a plate layout file.
+* `Ct Threshold`. These should all be `0.2`. We will check that for quality control.
+* `Automatic Ct Threshold`. These should all be `FALSE`
+* `Target Name` can be used to distinguish experimental samples ("Barcode_1") from blanks ("Blank") and NTCs ("Barcode_1_NTC"). We'll encode these as factors because they have a limited set of values.
+
+We'll also rename the columns consistently in "snake case" (i.e., all lowercase with underscores separating the words.)
+
+```{r}
+experiment_1 |>
+  transmute(
+    ct = as.numeric(CT),
+    sample_name = `Sample Name`,
+    well_position = `Well Position`,
+    ct_threshold = `Ct Threshold`,
+    auto_ct_threshold = `Automatic Ct Threshold`,
+    target_name = as.factor(`Target Name`)
+  )
+```
+
+We find 78 rows. We have a 96-well plate but the first two rows only have 3 samples. 96 - 2*9 = 78.
+
+TODO: It would be nice to specify what values to convert to `NA` quietly.
+In the future we may want to redo the baseline subtraction manually, but for now, we'll ignore those columns.
+
+Currently we have the `sample_name` column, which contains three pieces of information: the experiment (e.g., "A", "B", ...), the timepoint, and the technical replicate number.
+To make the data tidier, we'll split this into separate columns.
 
 # Convert raw Ct values to concentrations
 
