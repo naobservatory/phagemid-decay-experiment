@@ -1,0 +1,16 @@
+---
+title: "qPCR Analysis"
+output: html_notebook
+---
+
+# Ingest data
+
+## Read qPCR data from excel files
+
+## Asign experimental labels to wells
+
+# Convert raw Ct values to concentrations
+
+# Plot concentrations vs time for each condition
+
+# Fit decay model
