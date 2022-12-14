@@ -2,6 +2,7 @@
 title: "qPCR Analysis"
 output: html_notebook
 ---
+
 ```{r}
 library(tidyverse)
 library(readxl)
@@ -15,11 +16,13 @@ Eventually, we might want to automate access to the data, but for now, we'll man
 
 ## Read qPCR data from excel files
 
+TODO: Import other plates
+
 For each plate, we'll read the "Results" sheet.
 The first 42 rows of the sheet are metadata that we don't need, so we'll skip them.
 
 ```{r}
-experiment_1 <- read_excel(
+experiment_1_raw <- read_excel(
   path = "data/Plate 1.xls",
   sheet = "Results",
   skip = 42
@@ -42,7 +45,7 @@ We're only going to keep a subset of columns:
 We'll also rename the columns consistently in "snake case" (i.e., all lowercase with underscores separating the words.)
 
 ```{r}
-experiment_1 |>
+experiment_1_extracted <- experiment_1_raw |>
   transmute(
     ct = as.numeric(CT),
     sample_name = `Sample Name`,
@@ -51,6 +54,7 @@ experiment_1 |>
     auto_ct_threshold = `Automatic Ct Threshold`,
     target_name = as.factor(`Target Name`)
   )
+glimpse(experiment_1_extracted)
 ```
 
 We find 78 rows. We have a 96-well plate but the first two rows only have 3 samples. 96 - 2*9 = 78.
@@ -61,8 +65,97 @@ In the future we may want to redo the baseline subtraction manually, but for now
 Currently we have the `sample_name` column, which contains three pieces of information: the experiment (e.g., "A", "B", ...), the timepoint, and the technical replicate number.
 To make the data tidier, we'll split this into separate columns.
 
+We will use regular expressions to match the expected pattern, which is:
+
+1. The start of the string
+2. The treatment group, specified by one or more letters
+3. The timepoint, specified by one or more numbers
+4. A period
+5. The technical replicate, specified by one or more numbers
+6. The end of the string
+
+In our input data, the non-template control was named "B1_NTC", which will break our naming scheme. We'll rename it to "NTC" first.
+```{r}
+experiment_1_tidy <- experiment_1_extracted |> 
+  mutate(
+    sample_name = str_replace(sample_name, "B1_NTC", "NTC")
+  ) |> 
+  separate_wider_regex(
+    sample_name,
+    patterns = c(
+      "^",
+      treatment_group = "[A-Za-z]+",
+      timepoint = "[0-9]+",
+      "\\.",
+      tech_rep = "[0-9]+",
+      "$"
+    ),
+    too_few = "align_start"
+  ) |> 
+  mutate(
+    treatment_group = as.factor(treatment_group),
+    timepoint = as.integer(timepoint),
+    tech_rep = as.factor(tech_rep)
+  )
+glimpse(experiment_1_tidy)
+```
+
 # Convert raw Ct values to concentrations
+
+From Ari's Excel sheet, we have the following steps:
+
+1. Use the regression coefficients from the standard to convert Ct values to "dilution" (this is a linear relationship $c_t = a d + b$)
+2. Convert dilution to concentration (in copies per microliter) using $\text{concentration} = C e^{\log(f_d) d}$, where $f_d$ is the fold-dilution at each dilution. In this case, $f_d = 10$.
+
+The variable $d$ labels the level of dilution where 9 is a 10x dilution of the original sample, 8 is 10x of dilution 9, etc.
+By implication, the coefficient $C$ is the expected concentration at dilution 0, i.e. the original concentration times $10^{10}$.
+
+Note that the coefficients $a$, $b$, and $C$, are phagemid-specific.
+The first two are estimated from the standard curve.
+$C$ is known from the experimental protocol.
+In the future we would like estimate these concentrations directly in this workflow.
+
+We need to specify these coefficients:
+```{r}
+std_curve_slope <- -3.6855
+std_curve_intercept <- 43.498
+concentration_at_d0 <- 0.9871
+dilution_factor <- 10
+```
+
+We'll apply the two equations in separate steps so we can compare intermediate values with Ari's spreadsheet. Eventually, we'll condense this into one conversion.
+```{r}
+experiment_1_concentration <- experiment_1_tidy |>
+  mutate(
+    dilution = (ct - std_curve_intercept) / std_curve_slope
+  ) |>
+  mutate(
+    concentration = concentration_at_d0 * dilution_factor ** dilution
+  )
+```
 
 # Plot concentrations vs time for each condition
 
+```{r}
+ggplot(data = experiment_1_concentration,
+       mapping = aes(x = timepoint, y = concentration, shape = treatment_group)) +
+  geom_point()
+```
+
+Let's look at within- vs between-technical replicate variation:
+```{r}
+ggplot(data = experiment_1_concentration,
+       mapping = aes(x = timepoint, y = concentration, shape = tech_rep)) +
+  geom_point() +
+  facet_wrap(facets = ~ treatment_group)
+```
+
 # Fit decay model
+
+# TODO
+
+- Importing other plates (plate 3 just has the negative control, so focus on plate 2)
+- Averages and standard deviations
+- Log plots
+- Fits
+- Normalization by timepoint zero
