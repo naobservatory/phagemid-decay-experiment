@@ -38,14 +38,15 @@ data_raw <- list.files(
   pattern = filename_pattern,
   full.names = TRUE
   ) |>
-    map(read_qpcr_excel) |> 
-    list_rbind()
-glimpse(data_raw)
+  map(read_qpcr_excel) |> 
+  list_rbind()
+show(data_raw)
 ```
 
 ## Tidy the data
 
-We're only going to keep a subset of columns:
+We're only going to keep a subset of columns.
+In the next block we extract the columns we want and convert them to the correct datatypes.
 
 * `CT`: the Ct value. Either "Undetermined" or a number. We'll use `as.numeric` to convert from a character string to a number (double).
 * `Sample Name` labels the content of the samples
@@ -55,6 +56,8 @@ We're only going to keep a subset of columns:
 * `Target Name` can be used to distinguish experimental samples ("Barcode_1") from blanks ("Blank") and NTCs ("Barcode_1_NTC"). We'll encode these as factors because they have a limited set of values.
 
 We'll also rename the columns consistently in "snake case" (i.e., all lowercase with underscores separating the words.)
+
+In the future we may want to redo the baseline subtraction manually, but for now, we'll ignore those columns.
 
 ```{r}
 data_extracted <- data_raw |>
@@ -66,10 +69,12 @@ data_extracted <- data_raw |>
     auto_ct_threshold = `Automatic Ct Threshold`,
     target_name = as.factor(`Target Name`)
   )
-glimpse(data_extracted)
+show(data_extracted)
 ```
 
-Quality control. Check assertions about ct threshold and autothreshold
+TODO: It would be nice to specify what values to convert to `NA` quietly.
+
+For quality control, let's check assertions our assertions about about `ct_threshold` and `autothreshold`.
 
 ```{r}
 expected_ct_threshold <- 0.2
@@ -79,9 +84,6 @@ data_extracted |>
     all_ct_theshold_expected = all(ct_threshold == expected_ct_threshold)
   )
 ```
-
-TODO: It would be nice to specify what values to convert to `NA` quietly.
-In the future we may want to redo the baseline subtraction manually, but for now, we'll ignore those columns.
 
 Currently we have the `sample_name` column, which contains three pieces of information: the experiment (e.g., "A", "B", ...), the timepoint, and the technical replicate number.
 To make the data tidier, we'll split this into separate columns.
@@ -124,16 +126,23 @@ data_tidy <- data_extracted |>
 glimpse(data_tidy)
 ```
 
+Let's make sure we have 9 blanks and NTCs (3 per plate) and 36 of the other treatments (3 pcr replicates * 3 technical replicates * 4 timepoints).
 ```{r}
 data_tidy |>
   group_by(treatment_group) |>
   count()
 ```
 
+First, let's take a look at the Blanks and NTCs. These should mostly have `NA` for their ct value.
 ```{r}
 data_tidy |> 
   filter(treatment_group == "Blank" | treatment_group == "NTC")
 ```
+
+We can make a boxplot to compare the distribution of ct across treatments.
+To disply the NAs, we'll set them to one more than the maximum possible values.
+We see that the Blanks, NTCs, and treatment E (which is some sort of negative control?) have CT > 35, with a few outliers.
+We'll probably want to check those at some point.
 
 ```{r}
 ct_max <- max(data_tidy$ct, na.rm = TRUE) + 1
@@ -142,7 +151,6 @@ data_tidy |>
   ggplot(mapping = aes(ct, treatment_group)) +
   geom_boxplot()
 ```
-
 
 # Convert raw Ct values to concentrations
 
@@ -168,6 +176,9 @@ dilution_factor <- 10
 ```
 
 We'll apply the two equations in separate steps so we can compare intermediate values with Ari's spreadsheet. Eventually, we'll condense this into one conversion.
+
+We're also going to filter out the negative controls from now on.
+
 ```{r}
 treatments_to_keep <- c("A", "B", "C", "D")
 data_concentration <- data_tidy |>
@@ -179,6 +190,8 @@ data_concentration <- data_tidy |>
 glimpse(data_concentration)
 ```
 
+Since we have three PCR replicates per technical replicate, we can summarize our data with min, median, and max without any loss of information.
+
 ```{r}
 data_concentration |>
   group_by(treatment_group, timepoint, tech_rep) |>
@@ -189,8 +202,9 @@ data_concentration |>
   )
 ```
 
-
 # Plot log concentrations vs time for each condition
+
+First, we plot all the treatment groups on the same timecourse to see differences in absolute as well as relative concentration.
 
 ```{r}
 data_concentration |> 
@@ -220,6 +234,8 @@ data_concentration |>
     )
 ```
 
+The variation between treatments is swamping the variation between replicates, so let's let the y-axis vary:
+
 ```{r}
 data_concentration |>
   ggplot(aes(timepoint,log_concentration, group = tech_rep)) +
@@ -236,6 +252,10 @@ data_concentration |>
     )
 ```
 
+It looks like there is sometimes significantly more variation between technical replicates than PCR replicates.
+This suggests that we may want to use a hierarchical model of the error.
+
+We can use a Loess curve to see the trend for each treatment:
 ```{r}
 data_concentration |>
   ggplot(aes(timepoint, log_concentration, color=treatment_group)) +
@@ -243,6 +263,7 @@ data_concentration |>
   geom_smooth()
 ```
 
+It's not really appropriate here since our data is non-linear, but we can also use a linear model:
 ```{r}
 data_concentration |>
   ggplot(aes(timepoint, log_concentration, color=treatment_group)) +
@@ -252,8 +273,13 @@ data_concentration |>
   )
 ```
 
+We can fit linear models separately for each timepoint and examine the coefficients and standard errors:
 
-# TODO
+```{r}
+treatments_to_keep |> 
+  map(~ filter(data_concentration, treatment_group == .x)) |>
+  map(~ lm(log_concentration ~ timepoint, .x)) |>
+  map(summary)
+```
 
-- Analysis of variance (between and within technical replicates, heteroskedacity)
-- Model fits
+TODO: pass the treatment group along the pipe
