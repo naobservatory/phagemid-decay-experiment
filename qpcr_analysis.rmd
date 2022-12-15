@@ -1,6 +1,8 @@
 ---
 title: "qPCR Analysis"
-output: html_notebook
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r}
@@ -12,23 +14,35 @@ library(readxl)
 
 The qPCR machine outputs its data in excel files.
 For this experiment, we can find the files [in our lab google drive](https://drive.google.com/drive/folders/1W7bcgLTdgLp2NX2_Yl3J17dTZ71Bi6Ib).
-Eventually, we might want to automate access to the data, but for now, we'll manually download Plates 1, 2, and 3 excel files and save to the data directory.
+Eventually, we might want to automate access to the data, but for now, we'll manually download Plates 1, 2, and 3 excel files and save to the `data/` directory.
 
 ## Read qPCR data from excel files
 
-TODO: Import other plates
-
 For each plate, we'll read the "Results" sheet.
 The first 42 rows of the sheet are metadata that we don't need, so we'll skip them.
+```{r}
+read_qpcr_excel <- function(path) {
+  read_excel(
+    path = path,
+    sheet = "Results",
+    skip = 42
+  )
+}
+```
+
+TODO: keep track of plate names when merging.
 
 ```{r}
-experiment_1_raw <- read_excel(
-  path = "data/Plate 1.xls",
-  sheet = "Results",
-  skip = 42
-)
-
-glimpse(experiment_1)
+data_dir <- "data/"
+filename_pattern <- "Plate [0-9]+[.]xls"
+data_raw <- list.files(
+  data_dir,
+  pattern = filename_pattern,
+  full.names = TRUE
+  ) |>
+    map(read_qpcr_excel) |> 
+    list_rbind()
+glimpse(data_raw)
 ```
 
 ## Tidy the data
@@ -45,7 +59,7 @@ We're only going to keep a subset of columns:
 We'll also rename the columns consistently in "snake case" (i.e., all lowercase with underscores separating the words.)
 
 ```{r}
-experiment_1_extracted <- experiment_1_raw |>
+data_extracted <- data_raw |>
   transmute(
     ct = as.numeric(CT),
     sample_name = `Sample Name`,
@@ -54,10 +68,19 @@ experiment_1_extracted <- experiment_1_raw |>
     auto_ct_threshold = `Automatic Ct Threshold`,
     target_name = as.factor(`Target Name`)
   )
-glimpse(experiment_1_extracted)
+glimpse(data_extracted)
 ```
 
-We find 78 rows. We have a 96-well plate but the first two rows only have 3 samples. 96 - 2*9 = 78.
+Quality control. Check assertions about ct threshold and autothreshold
+
+```{r}
+expected_ct_threshold <- 0.2
+data_extracted |> 
+  summarize(
+    all_auto_ct_theshold_false = all(!auto_ct_threshold),
+    all_ct_theshold_expected = all(ct_threshold == expected_ct_threshold)
+  )
+```
 
 TODO: It would be nice to specify what values to convert to `NA` quietly.
 In the future we may want to redo the baseline subtraction manually, but for now, we'll ignore those columns.
@@ -75,8 +98,11 @@ We will use regular expressions to match the expected pattern, which is:
 6. The end of the string
 
 In our input data, the non-template control was named "B1_NTC", which will break our naming scheme. We'll rename it to "NTC" first.
+
+TODO: Convert the treatment group letters to actual names
+
 ```{r}
-experiment_1_tidy <- experiment_1_extracted |> 
+data_tidy <- data_extracted |> 
   mutate(
     sample_name = str_replace(sample_name, "B1_NTC", "NTC")
   ) |> 
@@ -97,8 +123,28 @@ experiment_1_tidy <- experiment_1_extracted |>
     timepoint = as.integer(timepoint),
     tech_rep = as.factor(tech_rep)
   )
-glimpse(experiment_1_tidy)
+glimpse(data_tidy)
 ```
+
+```{r}
+data_tidy |>
+  group_by(treatment_group) |>
+  count()
+```
+
+```{r}
+data_tidy |> 
+  filter(treatment_group == "Blank" | treatment_group == "NTC")
+```
+
+```{r}
+ct_max <- max(data_tidy$ct, na.rm = TRUE) + 1
+data_tidy |>
+  mutate(ct = replace_na(ct, ct_max)) |>
+  ggplot(mapping = aes(ct, treatment_group)) +
+  geom_boxplot()
+```
+
 
 # Convert raw Ct values to concentrations
 
@@ -125,37 +171,91 @@ dilution_factor <- 10
 
 We'll apply the two equations in separate steps so we can compare intermediate values with Ari's spreadsheet. Eventually, we'll condense this into one conversion.
 ```{r}
-experiment_1_concentration <- experiment_1_tidy |>
+treatments_to_keep <- c("A", "B", "C", "D")
+data_concentration <- data_tidy |>
+  filter(treatment_group %in% treatments_to_keep) |>
   mutate(
-    dilution = (ct - std_curve_intercept) / std_curve_slope
-  ) |>
-  mutate(
-    concentration = concentration_at_d0 * dilution_factor ** dilution
+    dilution = (ct - std_curve_intercept) / std_curve_slope,
+    log_concentration = log(concentration_at_d0) + log(dilution_factor) * dilution,
+  )
+glimpse(data_concentration)
+```
+
+```{r}
+data_concentration |>
+  group_by(treatment_group, timepoint, tech_rep) |>
+  summarize(
+    conc_min = min(log_concentration, na.rm = TRUE),
+    conc_med = median(log_concentration, na.rm = TRUE),
+    conc_max = max(log_concentration, na.rm = TRUE)
   )
 ```
 
-# Plot concentrations vs time for each condition
+
+# Plot log concentrations vs time for each condition
 
 ```{r}
-ggplot(data = experiment_1_concentration,
-       mapping = aes(x = timepoint, y = concentration, shape = treatment_group)) +
-  geom_point()
+data_concentration |> 
+  ggplot(
+    aes(timepoint, log_concentration, shape = treatment_group, color = treatment_group)
+    ) +
+  geom_jitter(
+    height = 0,
+    width = 0.1
+  )
 ```
 
 Let's look at within- vs between-technical replicate variation:
+
 ```{r}
-ggplot(data = experiment_1_concentration,
-       mapping = aes(x = timepoint, y = concentration, shape = tech_rep)) +
-  geom_point() +
-  facet_wrap(facets = ~ treatment_group)
+data_concentration |>
+  ggplot(aes(timepoint,log_concentration, group = tech_rep)) +
+  stat_summary(
+    fun.min = min,
+    fun.max = max,
+    fun = median,
+    position = position_dodge(width = 0.2),
+    size = 0.2
+    ) +
+  facet_wrap(
+    facets = ~ treatment_group,
+    )
 ```
 
-# Fit decay model
+```{r}
+data_concentration |>
+  ggplot(aes(timepoint,log_concentration, group = tech_rep)) +
+  stat_summary(
+    fun.min = min,
+    fun.max = max,
+    fun = median,
+    position = position_dodge(width = 0.2),
+    size = 0.2
+    ) +
+  facet_wrap(
+    facets = ~ treatment_group,
+    scales = "free_y"
+    )
+```
+
+```{r}
+data_concentration |>
+  ggplot(aes(timepoint, log_concentration, color=treatment_group)) +
+  geom_point() +
+  geom_smooth()
+```
+
+```{r}
+data_concentration |>
+  ggplot(aes(timepoint, log_concentration, color=treatment_group)) +
+  geom_point() +
+  geom_smooth(
+    method = "lm"
+  )
+```
+
 
 # TODO
 
-- Importing other plates (plate 3 just has the negative control, so focus on plate 2)
-- Averages and standard deviations
-- Log plots
-- Fits
-- Normalization by timepoint zero
+- Analysis of variance (between and within technical replicates, heteroskedacity)
+- Model fits

@@ -797,13 +797,21 @@
     },
     "purrr": {
       "Package": "purrr",
-      "Version": "0.3.5",
-      "Source": "Repository",
-      "Repository": "CRAN",
-      "Hash": "54842a2443c76267152eface28d9e90a",
+      "Version": "0.9000.0.9000",
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteUsername": "tidyverse",
+      "RemoteRepo": "purrr",
+      "RemoteRef": "main",
+      "RemoteSha": "00fc8aa519e14954588a93352c61ebdfef57ec87",
+      "Hash": "c94bd1fcabb1292067e28e10cfcf6373",
       "Requirements": [
+        "cli",
+        "lifecycle",
         "magrittr",
-        "rlang"
+        "rlang",
+        "vctrs"
       ]
     },
     "rappdirs": {
