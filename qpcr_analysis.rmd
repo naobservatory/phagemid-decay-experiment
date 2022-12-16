@@ -268,7 +268,7 @@ In the future, we'll look at a hierarchical model that incorporates the dependen
 ## Treating all observations as independent
 
 We can use a Loess curve to see the trend for each treatment:
-```{r}
+```{r, warning=FALSE}
 data_concentration |>
   ggplot(aes(timepoint, log_concentration, color=treatment_group)) +
   geom_point() +
