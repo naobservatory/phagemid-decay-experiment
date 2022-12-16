@@ -18,17 +18,17 @@ Eventually, we might want to automate access to the data, but for now, we'll man
 
 For each plate, we'll read the "Results" sheet.
 The first 42 rows of the sheet are metadata that we don't need, so we'll skip them.
+We'll also save the path in a column called "source" so we can look for plate effects if we'd like after we merge files.
 ```{r}
 read_qpcr_excel <- function(path) {
   read_excel(
     path = path,
     sheet = "Results",
     skip = 42
-  )
+  ) |>
+    mutate(source = path)
 }
 ```
-
-TODO: keep track of plate names when merging.
 
 ```{r}
 data_dir <- "data/"
@@ -277,8 +277,8 @@ We can fit linear models separately for each timepoint and examine the coefficie
 
 ```{r}
 treatments_to_keep |> 
-  map(~ filter(data_concentration, treatment_group == .x)) |>
-  map(~ lm(log_concentration ~ timepoint, .x)) |>
+  map(~ filter(data_concentration, treatment_group == .)) |>
+  map(~ lm(log_concentration ~ timepoint, .)) |>
   map(summary)
 ```
 

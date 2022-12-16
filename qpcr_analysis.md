@@ -30,7 +30,9 @@ we’ll manually download Plates 1, 2, and 3 excel files and save to the
 ## Read qPCR data from excel files
 
 For each plate, we’ll read the “Results” sheet. The first 42 rows of the
-sheet are metadata that we don’t need, so we’ll skip them.
+sheet are metadata that we don’t need, so we’ll skip them. We’ll also
+save the path in a column called “source” so we can look for plate
+effects if we’d like after we merge files.
 
 ``` r
 read_qpcr_excel <- function(path) {
@@ -38,11 +40,10 @@ read_qpcr_excel <- function(path) {
     path = path,
     sheet = "Results",
     skip = 42
-  )
+  ) |>
+    mutate(source = path)
 }
 ```
-
-TODO: keep track of plate names when merging.
 
 ``` r
 data_dir <- "data/"
@@ -57,7 +58,7 @@ data_raw <- list.files(
 show(data_raw)
 ```
 
-    ## # A tibble: 198 × 33
+    ## # A tibble: 198 × 34
     ##     Well Well Positi…¹ Omit  Sampl…² Targe…³ Task  Repor…⁴ Quenc…⁵ CT    Ct Me…⁶
     ##    <dbl> <chr>         <lgl> <chr>   <chr>   <chr> <chr>   <chr>   <chr>   <dbl>
     ##  1     1 A1            FALSE Blank   Blank   UNKN… FAM     NFQ-MGB Unde…    NA  
@@ -70,7 +71,7 @@ show(data_raw)
     ##  8    26 C2            FALSE A0.2    Barcod… UNKN… FAM     NFQ-MGB 19.7…    19.9
     ##  9    27 C3            FALSE A0.3    Barcod… UNKN… FAM     NFQ-MGB 18.8…    19.0
     ## 10    28 C4            FALSE A1.1    Barcod… UNKN… FAM     NFQ-MGB 18.8…    18.9
-    ## # … with 188 more rows, 23 more variables: `Ct SD` <dbl>, Quantity <lgl>,
+    ## # … with 188 more rows, 24 more variables: `Ct SD` <dbl>, Quantity <lgl>,
     ## #   `Quantity Mean` <lgl>, `Quantity SD` <lgl>, `Y-Intercept` <lgl>,
     ## #   `R(superscript 2)` <lgl>, Slope <lgl>, Efficiency <lgl>,
     ## #   `Automatic Ct Threshold` <lgl>, `Ct Threshold` <dbl>,
@@ -597,15 +598,15 @@ coefficients and standard errors:
 
 ``` r
 treatments_to_keep |> 
-  map(~ filter(data_concentration, treatment_group == .x)) |>
-  map(~ lm(log_concentration ~ timepoint, .x)) |>
+  map(~ filter(data_concentration, treatment_group == .)) |>
+  map(~ lm(log_concentration ~ timepoint, .)) |>
   map(summary)
 ```
 
     ## [[1]]
     ## 
     ## Call:
-    ## lm(formula = log_concentration ~ timepoint, data = .x)
+    ## lm(formula = log_concentration ~ timepoint, data = .)
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
@@ -626,7 +627,7 @@ treatments_to_keep |>
     ## [[2]]
     ## 
     ## Call:
-    ## lm(formula = log_concentration ~ timepoint, data = .x)
+    ## lm(formula = log_concentration ~ timepoint, data = .)
     ## 
     ## Residuals:
     ##      Min       1Q   Median       3Q      Max 
@@ -647,7 +648,7 @@ treatments_to_keep |>
     ## [[3]]
     ## 
     ## Call:
-    ## lm(formula = log_concentration ~ timepoint, data = .x)
+    ## lm(formula = log_concentration ~ timepoint, data = .)
     ## 
     ## Residuals:
     ##      Min       1Q   Median       3Q      Max 
@@ -668,7 +669,7 @@ treatments_to_keep |>
     ## [[4]]
     ## 
     ## Call:
-    ## lm(formula = log_concentration ~ timepoint, data = .x)
+    ## lm(formula = log_concentration ~ timepoint, data = .)
     ## 
     ## Residuals:
     ##      Min       1Q   Median       3Q      Max 
