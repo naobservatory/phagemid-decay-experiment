@@ -111,7 +111,17 @@ coding = list(
   "D" = "WW + phagemid + bleach",
   "E" = "Just WW"
 )
+
 controls <-  c("Blank", "NTC", "Just WW")
+
+sample_name_pattern = c(
+  "^",
+  treatment_group = "[A-Za-z]+",
+  timepoint = "[0-9]+",
+  "\\.",
+  tech_rep = "[0-9]+",
+  "$"
+)
 
 data_tidy <- data_extracted |> 
   mutate(
@@ -119,14 +129,7 @@ data_tidy <- data_extracted |>
   ) |> 
   separate_wider_regex(
     sample_name,
-    patterns = c(
-      "^",
-      treatment_group = "[A-Za-z]+",
-      timepoint = "[0-9]+",
-      "\\.",
-      tech_rep = "[0-9]+",
-      "$"
-    ),
+    patterns = sample_name_pattern,
     too_few = "align_start"
   ) |> 
   mutate(
@@ -299,16 +302,22 @@ data_concentration |>
 ```
 
 ```{r}
-treatments_to_keep <- unique(data_concentration$treatment_group) 
-models <- treatments_to_keep |> 
-  map(~ filter(data_concentration, treatment_group == .)) |>
-  map(~ lm(log10_concentration ~ timepoint, .)) |>
-  map(tidy) |>
-  map2(
-    treatments_to_keep,
-    ~ mutate(.x, treatment_group=.y, collapsed=FALSE, .before=1)
-    ) |> 
-  list_rbind()
+# TODO: Make this function more generic
+fit_lm_by_treatment <- function(data){
+  treatments <- unique(data$treatment_group) 
+  models <- treatments |> 
+    map(~ filter(data, treatment_group == .)) |>
+    map(~ lm(log10_concentration ~ timepoint, .)) |>
+    map(tidy) |>
+    map2(
+      treatments,
+      ~ mutate(.x, treatment_group=.y, .before=1)
+      ) |> 
+    list_rbind()
+}
+
+models <- fit_lm_by_treatment(data_concentration) |> 
+    mutate(collapsed=FALSE, .before=1)
 kable(models)
 ```
 
@@ -343,21 +352,15 @@ data_collapsed |>
 We can fit linear models separately for each timepoint and examine the coefficients and standard errors:
 
 ```{r}
-models_collapsed <- treatments_to_keep |> 
-  map(~ filter(data_collapsed, treatment_group == .)) |>
-  map(~ lm(log10_concentration ~ timepoint, .)) |>
-  map(tidy) |>
-  map2(
-    treatments_to_keep,
-    ~ mutate(.x, treatment_group=.y, collapsed=TRUE, .before=1)
-    ) |> 
-  list_rbind() 
-kable(models_collapsed)
+models_collapsed <- fit_lm_by_treatment(data_collapsed) |> 
+    mutate(collapsed=TRUE, .before=1)
+models_all <- rbind(models, models_collapsed)
+kable(models_all)
 ```
 
 Collapsing the qPCR replicates increases the standard error of the regression coefficients:
 ```{r}
-rbind(models, models_collapsed) |> 
+models_all |> 
   filter(term == "timepoint") |> 
   ggplot(aes(collapsed, std.error, group=treatment_group)) +
   geom_line(aes(linetype = treatment_group)) +

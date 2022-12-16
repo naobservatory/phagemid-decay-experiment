@@ -178,7 +178,17 @@ coding = list(
   "D" = "WW + phagemid + bleach",
   "E" = "Just WW"
 )
+
 controls <-  c("Blank", "NTC", "Just WW")
+
+sample_name_pattern = c(
+  "^",
+  treatment_group = "[A-Za-z]+",
+  timepoint = "[0-9]+",
+  "\\.",
+  tech_rep = "[0-9]+",
+  "$"
+)
 
 data_tidy <- data_extracted |> 
   mutate(
@@ -186,14 +196,7 @@ data_tidy <- data_extracted |>
   ) |> 
   separate_wider_regex(
     sample_name,
-    patterns = c(
-      "^",
-      treatment_group = "[A-Za-z]+",
-      timepoint = "[0-9]+",
-      "\\.",
-      tech_rep = "[0-9]+",
-      "$"
-    ),
+    patterns = sample_name_pattern,
     too_few = "align_start"
   ) |> 
   mutate(
@@ -515,29 +518,35 @@ data_concentration |>
 ![](qpcr_analysis_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
 
 ``` r
-treatments_to_keep <- unique(data_concentration$treatment_group) 
-models <- treatments_to_keep |> 
-  map(~ filter(data_concentration, treatment_group == .)) |>
-  map(~ lm(log10_concentration ~ timepoint, .)) |>
-  map(tidy) |>
-  map2(
-    treatments_to_keep,
-    ~ mutate(.x, treatment_group=.y, collapsed=FALSE, .before=1)
-    ) |> 
-  list_rbind()
+# TODO: Make this function more generic
+fit_lm_by_treatment <- function(data){
+  treatments <- unique(data$treatment_group) 
+  models <- treatments |> 
+    map(~ filter(data, treatment_group == .)) |>
+    map(~ lm(log10_concentration ~ timepoint, .)) |>
+    map(tidy) |>
+    map2(
+      treatments,
+      ~ mutate(.x, treatment_group=.y, .before=1)
+      ) |> 
+    list_rbind()
+}
+
+models <- fit_lm_by_treatment(data_concentration) |> 
+    mutate(collapsed=FALSE, .before=1)
 kable(models)
 ```
 
-| treatment_group           | collapsed | term        |   estimate | std.error |   statistic |   p.value |
-|:--------------------------|:----------|:------------|-----------:|----------:|------------:|----------:|
-| WW + phagemid             | FALSE     | (Intercept) |  6.5175269 | 0.0340310 | 191.5175973 | 0.0000000 |
-| WW + phagemid             | FALSE     | timepoint   | -0.0032189 | 0.0181903 |  -0.1769585 | 0.8605909 |
-| WW + phagemid + detergent | FALSE     | (Intercept) |  6.5336741 | 0.0662993 |  98.5481520 | 0.0000000 |
-| WW + phagemid + detergent | FALSE     | timepoint   | -0.2270536 | 0.0354385 |  -6.4069822 | 0.0000003 |
-| WW + phagemid + bleach    | FALSE     | (Intercept) |  4.3339145 | 0.1243730 |  34.8461059 | 0.0000000 |
-| WW + phagemid + bleach    | FALSE     | timepoint   | -0.4668962 | 0.0664802 |  -7.0230909 | 0.0000000 |
-| TBS + phagemid            | FALSE     | (Intercept) |  6.8619033 | 0.0148942 | 460.7106971 | 0.0000000 |
-| TBS + phagemid            | FALSE     | timepoint   | -0.0336933 | 0.0079613 |  -4.2321566 | 0.0001657 |
+| collapsed | treatment_group           | term        |   estimate | std.error |   statistic |   p.value |
+|:----------|:--------------------------|:------------|-----------:|----------:|------------:|----------:|
+| FALSE     | WW + phagemid             | (Intercept) |  6.5175269 | 0.0340310 | 191.5175973 | 0.0000000 |
+| FALSE     | WW + phagemid             | timepoint   | -0.0032189 | 0.0181903 |  -0.1769585 | 0.8605909 |
+| FALSE     | WW + phagemid + detergent | (Intercept) |  6.5336741 | 0.0662993 |  98.5481520 | 0.0000000 |
+| FALSE     | WW + phagemid + detergent | timepoint   | -0.2270536 | 0.0354385 |  -6.4069822 | 0.0000003 |
+| FALSE     | WW + phagemid + bleach    | (Intercept) |  4.3339145 | 0.1243730 |  34.8461059 | 0.0000000 |
+| FALSE     | WW + phagemid + bleach    | timepoint   | -0.4668962 | 0.0664802 |  -7.0230909 | 0.0000000 |
+| FALSE     | TBS + phagemid            | (Intercept) |  6.8619033 | 0.0148942 | 460.7106971 | 0.0000000 |
+| FALSE     | TBS + phagemid            | timepoint   | -0.0336933 | 0.0079613 |  -4.2321566 | 0.0001657 |
 
 ## Collapsing qPCR replicates
 
@@ -581,34 +590,36 @@ We can fit linear models separately for each timepoint and examine the
 coefficients and standard errors:
 
 ``` r
-models_collapsed <- treatments_to_keep |> 
-  map(~ filter(data_collapsed, treatment_group == .)) |>
-  map(~ lm(log10_concentration ~ timepoint, .)) |>
-  map(tidy) |>
-  map2(
-    treatments_to_keep,
-    ~ mutate(.x, treatment_group=.y, collapsed=TRUE, .before=1)
-    ) |> 
-  list_rbind() 
-kable(models_collapsed)
+models_collapsed <- fit_lm_by_treatment(data_collapsed) |> 
+    mutate(collapsed=TRUE, .before=1)
+models_all <- rbind(models, models_collapsed)
+kable(models_all)
 ```
 
-| treatment_group           | collapsed | term        |   estimate | std.error |  statistic |   p.value |
-|:--------------------------|:----------|:------------|-----------:|----------:|-----------:|----------:|
-| WW + phagemid             | TRUE      | (Intercept) |  6.5175269 | 0.0608769 | 107.060722 | 0.0000000 |
-| WW + phagemid             | TRUE      | timepoint   | -0.0032189 | 0.0325401 |  -0.098922 | 0.9231551 |
-| WW + phagemid + detergent | TRUE      | (Intercept) |  6.5336741 | 0.1208882 |  54.047265 | 0.0000000 |
-| WW + phagemid + detergent | TRUE      | timepoint   | -0.2270536 | 0.0646174 |  -3.513814 | 0.0055959 |
-| WW + phagemid + bleach    | TRUE      | (Intercept) |  4.3339145 | 0.2265403 |  19.130880 | 0.0000000 |
-| WW + phagemid + bleach    | TRUE      | timepoint   | -0.4668962 | 0.1210909 |  -3.855751 | 0.0031822 |
-| TBS + phagemid            | TRUE      | (Intercept) |  6.8619033 | 0.0210399 | 326.137321 | 0.0000000 |
-| TBS + phagemid            | TRUE      | timepoint   | -0.0336933 | 0.0112463 |  -2.995946 | 0.0134364 |
+| collapsed | treatment_group           | term        |   estimate | std.error |   statistic |   p.value |
+|:----------|:--------------------------|:------------|-----------:|----------:|------------:|----------:|
+| FALSE     | WW + phagemid             | (Intercept) |  6.5175269 | 0.0340310 | 191.5175973 | 0.0000000 |
+| FALSE     | WW + phagemid             | timepoint   | -0.0032189 | 0.0181903 |  -0.1769585 | 0.8605909 |
+| FALSE     | WW + phagemid + detergent | (Intercept) |  6.5336741 | 0.0662993 |  98.5481520 | 0.0000000 |
+| FALSE     | WW + phagemid + detergent | timepoint   | -0.2270536 | 0.0354385 |  -6.4069822 | 0.0000003 |
+| FALSE     | WW + phagemid + bleach    | (Intercept) |  4.3339145 | 0.1243730 |  34.8461059 | 0.0000000 |
+| FALSE     | WW + phagemid + bleach    | timepoint   | -0.4668962 | 0.0664802 |  -7.0230909 | 0.0000000 |
+| FALSE     | TBS + phagemid            | (Intercept) |  6.8619033 | 0.0148942 | 460.7106971 | 0.0000000 |
+| FALSE     | TBS + phagemid            | timepoint   | -0.0336933 | 0.0079613 |  -4.2321566 | 0.0001657 |
+| TRUE      | TBS + phagemid            | (Intercept) |  6.8619033 | 0.0210399 | 326.1373215 | 0.0000000 |
+| TRUE      | TBS + phagemid            | timepoint   | -0.0336933 | 0.0112463 |  -2.9959457 | 0.0134364 |
+| TRUE      | WW + phagemid             | (Intercept) |  6.5175269 | 0.0608769 | 107.0607222 | 0.0000000 |
+| TRUE      | WW + phagemid             | timepoint   | -0.0032189 | 0.0325401 |  -0.0989220 | 0.9231551 |
+| TRUE      | WW + phagemid + bleach    | (Intercept) |  4.3339145 | 0.2265403 |  19.1308805 | 0.0000000 |
+| TRUE      | WW + phagemid + bleach    | timepoint   | -0.4668962 | 0.1210909 |  -3.8557511 | 0.0031822 |
+| TRUE      | WW + phagemid + detergent | (Intercept) |  6.5336741 | 0.1208882 |  54.0472646 | 0.0000000 |
+| TRUE      | WW + phagemid + detergent | timepoint   | -0.2270536 | 0.0646174 |  -3.5138139 | 0.0055959 |
 
 Collapsing the qPCR replicates increases the standard error of the
 regression coefficients:
 
 ``` r
-rbind(models, models_collapsed) |> 
+models_all |> 
   filter(term == "timepoint") |> 
   ggplot(aes(collapsed, std.error, group=treatment_group)) +
   geom_line(aes(linetype = treatment_group)) +
