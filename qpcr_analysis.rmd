@@ -198,7 +198,7 @@ data_concentration <- data_tidy |>
   filter(!control) |>
   mutate(
     dilution = (ct - std_curve_intercept) / std_curve_slope,
-    log_concentration = log(concentration_at_d0) + log(dilution_factor) * dilution,
+    log10_concentration = log10(concentration_at_d0) + log10(dilution_factor) * dilution,
   )
 kable(head(data_concentration, n = 10))
 ```
@@ -209,9 +209,9 @@ Since we have three PCR replicates per technical replicate, we can summarize our
 data_concentration |>
   group_by(treatment_group, timepoint, tech_rep) |>
   summarize(
-    conc_min = min(log_concentration, na.rm = TRUE),
-    conc_med = median(log_concentration, na.rm = TRUE),
-    conc_max = max(log_concentration, na.rm = TRUE),
+    conc_min = min(log10_concentration, na.rm = TRUE),
+    conc_med = median(log10_concentration, na.rm = TRUE),
+    conc_max = max(log10_concentration, na.rm = TRUE),
     .groups="drop"
   ) |> 
   kable()
@@ -224,7 +224,7 @@ First, we plot all the treatment groups on the same timecourse to see difference
 ```{r}
 data_concentration |> 
   ggplot(
-    aes(timepoint, log_concentration, shape = treatment_group, color = treatment_group)
+    aes(timepoint, log10_concentration, shape = treatment_group, color = treatment_group)
     ) +
   geom_point(
     position = position_jitter(height = 0, width = 0.1, seed = 3579237)
@@ -235,7 +235,7 @@ Let's look at within- vs between-technical replicate variation:
 
 ```{r}
 data_concentration |>
-  ggplot(aes(timepoint,log_concentration, group = tech_rep)) +
+  ggplot(aes(timepoint,log10_concentration, group = tech_rep)) +
   stat_summary(
     fun.min = min,
     fun.max = max,
@@ -252,7 +252,7 @@ The variation between treatments is swamping the variation between replicates, s
 
 ```{r}
 data_concentration |>
-  ggplot(aes(timepoint,log_concentration, group = tech_rep)) +
+  ggplot(aes(timepoint,log10_concentration, group = tech_rep)) +
   stat_summary(
     fun.min = min,
     fun.max = max,
@@ -283,7 +283,7 @@ In the future, we'll look at a hierarchical model that incorporates the dependen
 We can use a Loess curve to see the trend for each treatment:
 ```{r, warning=FALSE}
 data_concentration |>
-  ggplot(aes(timepoint, log_concentration, color=treatment_group)) +
+  ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
   geom_point() +
   geom_smooth()
 ```
@@ -291,7 +291,7 @@ data_concentration |>
 It's not really appropriate here since our data is non-linear, but we can also use a linear model:
 ```{r}
 data_concentration |>
-  ggplot(aes(timepoint, log_concentration, color=treatment_group)) +
+  ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
   geom_point() +
   geom_smooth(
     method = "lm"
@@ -302,7 +302,7 @@ data_concentration |>
 treatments_to_keep <- unique(data_concentration$treatment_group) 
 models <- treatments_to_keep |> 
   map(~ filter(data_concentration, treatment_group == .)) |>
-  map(~ lm(log_concentration ~ timepoint, .)) |>
+  map(~ lm(log10_concentration ~ timepoint, .)) |>
   map(tidy) |>
   map2(
     treatments_to_keep,
@@ -317,17 +317,23 @@ kable(models)
 Now, we create a new table that collapses the qPCR replicates:
 ```{r}
 data_collapsed <- data_concentration |> 
-  group_by(treatment_group, timepoint) |>
-  summarise(log_concentration = mean(log_concentration), .groups="drop")
+  group_by(treatment_group, timepoint, tech_rep) |>
+  summarise(log10_concentration = mean(log10_concentration), .groups="drop")
 ```
 
-The Loess smoother is uninteresting because it will just draw a curve through the points with no error.
-
-On the other hand, we now have much wider error bars on our linear estimates.
+With the collapse, we have wider error bars on our linear estimates.
 Just as the independent approximation meant that the errors were too optimistic, this approximation is too conservative.
+
+```{r warning=FALSE}
+data_collapsed |>
+  ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
+  geom_point() +
+  geom_smooth()
+```
+
 ```{r}
 data_collapsed |>
-  ggplot(aes(timepoint, log_concentration, color=treatment_group)) +
+  ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
   geom_point() +
   geom_smooth(
     method = "lm"
@@ -339,7 +345,7 @@ We can fit linear models separately for each timepoint and examine the coefficie
 ```{r}
 models_collapsed <- treatments_to_keep |> 
   map(~ filter(data_collapsed, treatment_group == .)) |>
-  map(~ lm(log_concentration ~ timepoint, .)) |>
+  map(~ lm(log10_concentration ~ timepoint, .)) |>
   map(tidy) |>
   map2(
     treatments_to_keep,

@@ -325,23 +325,23 @@ data_concentration <- data_tidy |>
   filter(!control) |>
   mutate(
     dilution = (ct - std_curve_intercept) / std_curve_slope,
-    log_concentration = log(concentration_at_d0) + log(dilution_factor) * dilution,
+    log10_concentration = log10(concentration_at_d0) + log10(dilution_factor) * dilution,
   )
 kable(head(data_concentration, n = 10))
 ```
 
-|       ct | treatment_group | timepoint | tech_rep | well_position | ct_threshold | auto_ct_threshold | target_name | control | dilution | log_concentration |
-|---------:|:----------------|----------:|:---------|:--------------|-------------:|:------------------|:------------|:--------|---------:|------------------:|
-| 20.32065 | WW + phagemid   |         0 | 1        | C1            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.288793 |          14.46750 |
-| 19.76434 | WW + phagemid   |         0 | 2        | C2            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.439739 |          14.81506 |
-| 18.81370 | WW + phagemid   |         0 | 3        | C3            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.697681 |          15.40900 |
-| 18.81602 | WW + phagemid   |         1 | 1        | C4            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.697049 |          15.40754 |
-| 19.44741 | WW + phagemid   |         1 | 2        | C5            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.525733 |          15.01307 |
-| 19.54228 | WW + phagemid   |         1 | 3        | C6            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.499993 |          14.95380 |
-| 18.98299 | WW + phagemid   |         2 | 1        | C7            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.651747 |          15.30323 |
-| 18.98078 | WW + phagemid   |         2 | 2        | C8            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.652345 |          15.30461 |
-| 19.66541 | WW + phagemid   |         2 | 3        | C9            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.466582 |          14.87687 |
-| 20.02242 | WW + phagemid   |         3 | 1        | C10           |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.369714 |          14.65382 |
+|       ct | treatment_group | timepoint | tech_rep | well_position | ct_threshold | auto_ct_threshold | target_name | control | dilution | log10_concentration |
+|---------:|:----------------|----------:|:---------|:--------------|-------------:|:------------------|:------------|:--------|---------:|--------------------:|
+| 20.32065 | WW + phagemid   |         0 | 1        | C1            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.288793 |            6.283155 |
+| 19.76434 | WW + phagemid   |         0 | 2        | C2            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.439739 |            6.434100 |
+| 18.81370 | WW + phagemid   |         0 | 3        | C3            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.697681 |            6.692042 |
+| 18.81602 | WW + phagemid   |         1 | 1        | C4            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.697049 |            6.691410 |
+| 19.44741 | WW + phagemid   |         1 | 2        | C5            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.525733 |            6.520094 |
+| 19.54228 | WW + phagemid   |         1 | 3        | C6            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.499993 |            6.494354 |
+| 18.98299 | WW + phagemid   |         2 | 1        | C7            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.651747 |            6.646108 |
+| 18.98078 | WW + phagemid   |         2 | 2        | C8            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.652345 |            6.646706 |
+| 19.66541 | WW + phagemid   |         2 | 3        | C9            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.466582 |            6.460943 |
+| 20.02242 | WW + phagemid   |         3 | 1        | C10           |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.369714 |            6.364075 |
 
 Since we have three PCR replicates per technical replicate, we can
 summarize our data with min, median, and max without any loss of
@@ -351,64 +351,64 @@ information.
 data_concentration |>
   group_by(treatment_group, timepoint, tech_rep) |>
   summarize(
-    conc_min = min(log_concentration, na.rm = TRUE),
-    conc_med = median(log_concentration, na.rm = TRUE),
-    conc_max = max(log_concentration, na.rm = TRUE),
+    conc_min = min(log10_concentration, na.rm = TRUE),
+    conc_med = median(log10_concentration, na.rm = TRUE),
+    conc_max = max(log10_concentration, na.rm = TRUE),
     .groups="drop"
   ) |> 
   kable()
 ```
 
-| treatment_group           | timepoint | tech_rep |  conc_min |  conc_med |  conc_max |
-|:--------------------------|----------:|:---------|----------:|----------:|----------:|
-| TBS + phagemid            |         0 | 1        | 15.585203 | 15.730980 | 15.774331 |
-| TBS + phagemid            |         0 | 2        | 15.640385 | 15.744967 | 15.827471 |
-| TBS + phagemid            |         0 | 3        | 15.392854 | 15.860508 | 15.891046 |
-| TBS + phagemid            |         1 | 1        | 15.766611 | 15.774405 | 15.815867 |
-| TBS + phagemid            |         1 | 2        | 15.799626 | 15.835428 | 15.892060 |
-| TBS + phagemid            |         1 | 3        | 15.766942 | 15.780796 | 15.817647 |
-| TBS + phagemid            |         2 | 1        | 15.630437 | 15.666167 | 15.683122 |
-| TBS + phagemid            |         2 | 2        | 15.748995 | 15.762468 | 15.825183 |
-| TBS + phagemid            |         2 | 3        | 15.745316 | 15.745680 | 15.763973 |
-| TBS + phagemid            |         3 | 1        | 15.471512 | 15.509831 | 15.526576 |
-| TBS + phagemid            |         3 | 2        | 15.490110 | 15.504371 | 15.567375 |
-| TBS + phagemid            |         3 | 3        | 15.388014 | 15.439595 | 15.448920 |
-| WW + phagemid             |         0 | 1        | 14.467498 | 14.539121 | 14.559697 |
-| WW + phagemid             |         0 | 2        | 14.704875 | 14.752250 | 14.815063 |
-| WW + phagemid             |         0 | 3        | 15.020836 | 15.360500 | 15.408997 |
-| WW + phagemid             |         1 | 1        | 15.315593 | 15.392311 | 15.407542 |
-| WW + phagemid             |         1 | 2        | 15.013071 | 15.123416 | 15.193376 |
-| WW + phagemid             |         1 | 3        | 14.953803 | 14.979106 | 15.100242 |
-| WW + phagemid             |         2 | 1        | 15.222434 | 15.233419 | 15.303230 |
-| WW + phagemid             |         2 | 2        | 15.183994 | 15.304607 | 15.330360 |
-| WW + phagemid             |         2 | 3        | 14.873419 | 14.876872 | 14.948056 |
-| WW + phagemid             |         3 | 1        | 14.631852 | 14.651272 | 14.653825 |
-| WW + phagemid             |         3 | 2        | 14.742572 | 14.751832 | 14.800324 |
-| WW + phagemid             |         3 | 3        | 15.042985 | 15.098861 | 15.100316 |
-| WW + phagemid + bleach    |         0 | 1        | 11.023879 | 11.052359 | 11.103619 |
-| WW + phagemid + bleach    |         0 | 2        | 10.819916 | 10.849192 | 11.061266 |
-| WW + phagemid + bleach    |         0 | 3        | 10.687431 | 11.142662 | 11.213070 |
-| WW + phagemid + bleach    |         1 | 1        |  7.185397 |  7.231021 |  7.245195 |
-| WW + phagemid + bleach    |         1 | 2        |  7.247885 |  7.276237 |  7.328588 |
-| WW + phagemid + bleach    |         1 | 3        |  7.880027 |  8.045826 |  8.107687 |
-| WW + phagemid + bleach    |         2 | 1        |  7.131532 |  7.219262 |  7.287010 |
-| WW + phagemid + bleach    |         2 | 2        |  7.770489 |  7.813055 |  7.832202 |
-| WW + phagemid + bleach    |         2 | 3        |  7.650187 |  7.672781 |  7.842286 |
-| WW + phagemid + bleach    |         3 | 1        |  7.398282 |  7.554920 |  7.801422 |
-| WW + phagemid + bleach    |         3 | 2        |  6.148432 |  6.912249 |  7.093166 |
-| WW + phagemid + bleach    |         3 | 3        |  7.767307 |  7.889023 |  7.912897 |
-| WW + phagemid + detergent |         0 | 1        | 14.691215 | 14.707181 | 14.723714 |
-| WW + phagemid + detergent |         0 | 2        | 14.937496 | 14.981082 | 14.986873 |
-| WW + phagemid + detergent |         0 | 3        | 14.630075 | 14.772313 | 14.884848 |
-| WW + phagemid + detergent |         1 | 1        | 14.460672 | 14.507884 | 14.530743 |
-| WW + phagemid + detergent |         1 | 2        | 14.431200 | 14.524827 | 14.569874 |
-| WW + phagemid + detergent |         1 | 3        | 14.375207 | 14.747474 | 14.834689 |
-| WW + phagemid + detergent |         2 | 1        | 14.445850 | 14.506649 | 14.514520 |
-| WW + phagemid + detergent |         2 | 2        | 14.399098 | 14.540501 | 14.597506 |
-| WW + phagemid + detergent |         2 | 3        | 14.829546 | 14.885799 | 14.944224 |
-| WW + phagemid + detergent |         3 | 1        | 13.393890 | 13.420946 | 13.479134 |
-| WW + phagemid + detergent |         3 | 2        | 13.508365 | 13.536396 | 13.662985 |
-| WW + phagemid + detergent |         3 | 3        | 12.045272 | 12.175395 | 12.181063 |
+| treatment_group           | timepoint | tech_rep | conc_min | conc_med | conc_max |
+|:--------------------------|----------:|:---------|---------:|---------:|---------:|
+| TBS + phagemid            |         0 | 1        | 6.768568 | 6.831878 | 6.850705 |
+| TBS + phagemid            |         0 | 2        | 6.792533 | 6.837952 | 6.873783 |
+| TBS + phagemid            |         0 | 3        | 6.685031 | 6.888131 | 6.901394 |
+| TBS + phagemid            |         1 | 1        | 6.847352 | 6.850737 | 6.868744 |
+| TBS + phagemid            |         1 | 2        | 6.861691 | 6.877239 | 6.901834 |
+| TBS + phagemid            |         1 | 3        | 6.847496 | 6.853513 | 6.869517 |
+| TBS + phagemid            |         2 | 1        | 6.788213 | 6.803730 | 6.811093 |
+| TBS + phagemid            |         2 | 2        | 6.839702 | 6.845553 | 6.872789 |
+| TBS + phagemid            |         2 | 3        | 6.838104 | 6.838262 | 6.846207 |
+| TBS + phagemid            |         3 | 1        | 6.719192 | 6.735834 | 6.743106 |
+| TBS + phagemid            |         3 | 2        | 6.727269 | 6.733463 | 6.760825 |
+| TBS + phagemid            |         3 | 3        | 6.682930 | 6.705331 | 6.709381 |
+| WW + phagemid             |         0 | 1        | 6.283155 | 6.314260 | 6.323196 |
+| WW + phagemid             |         0 | 2        | 6.386246 | 6.406821 | 6.434100 |
+| WW + phagemid             |         0 | 3        | 6.523466 | 6.670980 | 6.692042 |
+| WW + phagemid             |         1 | 1        | 6.651478 | 6.684796 | 6.691410 |
+| WW + phagemid             |         1 | 2        | 6.520094 | 6.568016 | 6.598399 |
+| WW + phagemid             |         1 | 3        | 6.494354 | 6.505343 | 6.557952 |
+| WW + phagemid             |         2 | 1        | 6.611019 | 6.615790 | 6.646108 |
+| WW + phagemid             |         2 | 2        | 6.594325 | 6.646706 | 6.657891 |
+| WW + phagemid             |         2 | 3        | 6.459444 | 6.460943 | 6.491859 |
+| WW + phagemid             |         3 | 1        | 6.354533 | 6.362967 | 6.364075 |
+| WW + phagemid             |         3 | 2        | 6.402617 | 6.406639 | 6.427699 |
+| WW + phagemid             |         3 | 3        | 6.533085 | 6.557352 | 6.557984 |
+| WW + phagemid + bleach    |         0 | 1        | 4.787610 | 4.799978 | 4.822240 |
+| WW + phagemid + bleach    |         0 | 2        | 4.699030 | 4.711744 | 4.803847 |
+| WW + phagemid + bleach    |         0 | 3        | 4.641492 | 4.839197 | 4.869774 |
+| WW + phagemid + bleach    |         1 | 1        | 3.120579 | 3.140393 | 3.146548 |
+| WW + phagemid + bleach    |         1 | 2        | 3.147717 | 3.160030 | 3.182765 |
+| WW + phagemid + bleach    |         1 | 3        | 3.422252 | 3.494258 | 3.521124 |
+| WW + phagemid + bleach    |         2 | 1        | 3.097185 | 3.135286 | 3.164708 |
+| WW + phagemid + bleach    |         2 | 2        | 3.374681 | 3.393167 | 3.401482 |
+| WW + phagemid + bleach    |         2 | 3        | 3.322434 | 3.332246 | 3.405861 |
+| WW + phagemid + bleach    |         3 | 1        | 3.213033 | 3.281060 | 3.388114 |
+| WW + phagemid + bleach    |         3 | 2        | 2.670230 | 3.001952 | 3.080523 |
+| WW + phagemid + bleach    |         3 | 3        | 3.373299 | 3.426159 | 3.436528 |
+| WW + phagemid + detergent |         0 | 1        | 6.380314 | 6.387247 | 6.394428 |
+| WW + phagemid + detergent |         0 | 2        | 6.487272 | 6.506201 | 6.508716 |
+| WW + phagemid + detergent |         0 | 3        | 6.353761 | 6.415534 | 6.464407 |
+| WW + phagemid + detergent |         1 | 1        | 6.280190 | 6.300694 | 6.310621 |
+| WW + phagemid + detergent |         1 | 2        | 6.267391 | 6.308052 | 6.327616 |
+| WW + phagemid + detergent |         1 | 3        | 6.243073 | 6.404747 | 6.442623 |
+| WW + phagemid + detergent |         2 | 1        | 6.273753 | 6.300157 | 6.303576 |
+| WW + phagemid + detergent |         2 | 2        | 6.253449 | 6.314859 | 6.339616 |
+| WW + phagemid + detergent |         2 | 3        | 6.440390 | 6.464820 | 6.490194 |
+| WW + phagemid + detergent |         3 | 1        | 5.816892 | 5.828643 | 5.853913 |
+| WW + phagemid + detergent |         3 | 2        | 5.866608 | 5.878782 | 5.933759 |
+| WW + phagemid + detergent |         3 | 3        | 5.231195 | 5.287707 | 5.290168 |
 
 # Plot log concentrations vs time for each condition
 
@@ -418,7 +418,7 @@ differences in absolute as well as relative concentration.
 ``` r
 data_concentration |> 
   ggplot(
-    aes(timepoint, log_concentration, shape = treatment_group, color = treatment_group)
+    aes(timepoint, log10_concentration, shape = treatment_group, color = treatment_group)
     ) +
   geom_point(
     position = position_jitter(height = 0, width = 0.1, seed = 3579237)
@@ -431,7 +431,7 @@ Let’s look at within- vs between-technical replicate variation:
 
 ``` r
 data_concentration |>
-  ggplot(aes(timepoint,log_concentration, group = tech_rep)) +
+  ggplot(aes(timepoint,log10_concentration, group = tech_rep)) +
   stat_summary(
     fun.min = min,
     fun.max = max,
@@ -451,7 +451,7 @@ replicates, so let’s let the y-axis vary:
 
 ``` r
 data_concentration |>
-  ggplot(aes(timepoint,log_concentration, group = tech_rep)) +
+  ggplot(aes(timepoint,log10_concentration, group = tech_rep)) +
   stat_summary(
     fun.min = min,
     fun.max = max,
@@ -489,7 +489,7 @@ We can use a Loess curve to see the trend for each treatment:
 
 ``` r
 data_concentration |>
-  ggplot(aes(timepoint, log_concentration, color=treatment_group)) +
+  ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
   geom_point() +
   geom_smooth()
 ```
@@ -503,7 +503,7 @@ can also use a linear model:
 
 ``` r
 data_concentration |>
-  ggplot(aes(timepoint, log_concentration, color=treatment_group)) +
+  ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
   geom_point() +
   geom_smooth(
     method = "lm"
@@ -518,7 +518,7 @@ data_concentration |>
 treatments_to_keep <- unique(data_concentration$treatment_group) 
 models <- treatments_to_keep |> 
   map(~ filter(data_concentration, treatment_group == .)) |>
-  map(~ lm(log_concentration ~ timepoint, .)) |>
+  map(~ lm(log10_concentration ~ timepoint, .)) |>
   map(tidy) |>
   map2(
     treatments_to_keep,
@@ -530,14 +530,14 @@ kable(models)
 
 | treatment_group           | collapsed | term        |   estimate | std.error |   statistic |   p.value |
 |:--------------------------|:----------|:------------|-----------:|----------:|------------:|----------:|
-| WW + phagemid             | FALSE     | (Intercept) | 15.0071602 | 0.0783592 | 191.5175973 | 0.0000000 |
-| WW + phagemid             | FALSE     | timepoint   | -0.0074119 | 0.0418847 |  -0.1769585 | 0.8605909 |
-| WW + phagemid + detergent | FALSE     | (Intercept) | 15.0443407 | 0.1526598 |  98.5481520 | 0.0000000 |
-| WW + phagemid + detergent | FALSE     | timepoint   | -0.5228103 | 0.0816001 |  -6.4069822 | 0.0000003 |
-| WW + phagemid + bleach    | FALSE     | (Intercept) |  9.9792068 | 0.2863794 |  34.8461059 | 0.0000000 |
-| WW + phagemid + bleach    | FALSE     | timepoint   | -1.0750682 | 0.1530762 |  -7.0230909 | 0.0000000 |
-| TBS + phagemid            | FALSE     | (Intercept) | 15.8001163 | 0.0342951 | 460.7106971 | 0.0000000 |
-| TBS + phagemid            | FALSE     | timepoint   | -0.0775818 | 0.0183315 |  -4.2321566 | 0.0001657 |
+| WW + phagemid             | FALSE     | (Intercept) |  6.5175269 | 0.0340310 | 191.5175973 | 0.0000000 |
+| WW + phagemid             | FALSE     | timepoint   | -0.0032189 | 0.0181903 |  -0.1769585 | 0.8605909 |
+| WW + phagemid + detergent | FALSE     | (Intercept) |  6.5336741 | 0.0662993 |  98.5481520 | 0.0000000 |
+| WW + phagemid + detergent | FALSE     | timepoint   | -0.2270536 | 0.0354385 |  -6.4069822 | 0.0000003 |
+| WW + phagemid + bleach    | FALSE     | (Intercept) |  4.3339145 | 0.1243730 |  34.8461059 | 0.0000000 |
+| WW + phagemid + bleach    | FALSE     | timepoint   | -0.4668962 | 0.0664802 |  -7.0230909 | 0.0000000 |
+| TBS + phagemid            | FALSE     | (Intercept) |  6.8619033 | 0.0148942 | 460.7106971 | 0.0000000 |
+| TBS + phagemid            | FALSE     | timepoint   | -0.0336933 | 0.0079613 |  -4.2321566 | 0.0001657 |
 
 ## Collapsing qPCR replicates
 
@@ -545,20 +545,28 @@ Now, we create a new table that collapses the qPCR replicates:
 
 ``` r
 data_collapsed <- data_concentration |> 
-  group_by(treatment_group, timepoint) |>
-  summarise(log_concentration = mean(log_concentration), .groups="drop")
+  group_by(treatment_group, timepoint, tech_rep) |>
+  summarise(log10_concentration = mean(log10_concentration), .groups="drop")
 ```
 
-The Loess smoother is uninteresting because it will just draw a curve
-through the points with no error.
-
-On the other hand, we now have much wider error bars on our linear
-estimates. Just as the independent approximation meant that the errors
-were too optimistic, this approximation is too conservative.
+With the collapse, we have wider error bars on our linear estimates.
+Just as the independent approximation meant that the errors were too
+optimistic, this approximation is too conservative.
 
 ``` r
 data_collapsed |>
-  ggplot(aes(timepoint, log_concentration, color=treatment_group)) +
+  ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
+  geom_point() +
+  geom_smooth()
+```
+
+    ## `geom_smooth()` using method = 'loess' and formula = 'y ~ x'
+
+![](qpcr_analysis_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
+
+``` r
+data_collapsed |>
+  ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
   geom_point() +
   geom_smooth(
     method = "lm"
@@ -567,7 +575,7 @@ data_collapsed |>
 
     ## `geom_smooth()` using formula = 'y ~ x'
 
-![](qpcr_analysis_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
+![](qpcr_analysis_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
 
 We can fit linear models separately for each timepoint and examine the
 coefficients and standard errors:
@@ -575,7 +583,7 @@ coefficients and standard errors:
 ``` r
 models_collapsed <- treatments_to_keep |> 
   map(~ filter(data_collapsed, treatment_group == .)) |>
-  map(~ lm(log_concentration ~ timepoint, .)) |>
+  map(~ lm(log10_concentration ~ timepoint, .)) |>
   map(tidy) |>
   map2(
     treatments_to_keep,
@@ -585,16 +593,16 @@ models_collapsed <- treatments_to_keep |>
 kable(models_collapsed)
 ```
 
-| treatment_group           | collapsed | term        |   estimate | std.error |   statistic |   p.value |
-|:--------------------------|:----------|:------------|-----------:|----------:|------------:|----------:|
-| WW + phagemid             | TRUE      | (Intercept) | 15.0071602 | 0.1858890 |  80.7318212 | 0.0001534 |
-| WW + phagemid             | TRUE      | timepoint   | -0.0074119 | 0.0993619 |  -0.0745946 | 0.9473269 |
-| WW + phagemid + detergent | TRUE      | (Intercept) | 15.0443407 | 0.4725921 |  31.8336698 | 0.0009853 |
-| WW + phagemid + detergent | TRUE      | timepoint   | -0.5228103 | 0.2526111 |  -2.0696254 | 0.1743497 |
-| WW + phagemid + bleach    | TRUE      | (Intercept) |  9.9792068 | 1.0988973 |   9.0811095 | 0.0119099 |
-| WW + phagemid + bleach    | TRUE      | timepoint   | -1.0750682 | 0.5873853 |  -1.8302607 | 0.2086985 |
-| TBS + phagemid            | TRUE      | (Intercept) | 15.8001163 | 0.0994830 | 158.8222377 | 0.0000396 |
-| TBS + phagemid            | TRUE      | timepoint   | -0.0775818 | 0.0531759 |  -1.4589646 | 0.2819668 |
+| treatment_group           | collapsed | term        |   estimate | std.error |  statistic |   p.value |
+|:--------------------------|:----------|:------------|-----------:|----------:|-----------:|----------:|
+| WW + phagemid             | TRUE      | (Intercept) |  6.5175269 | 0.0608769 | 107.060722 | 0.0000000 |
+| WW + phagemid             | TRUE      | timepoint   | -0.0032189 | 0.0325401 |  -0.098922 | 0.9231551 |
+| WW + phagemid + detergent | TRUE      | (Intercept) |  6.5336741 | 0.1208882 |  54.047265 | 0.0000000 |
+| WW + phagemid + detergent | TRUE      | timepoint   | -0.2270536 | 0.0646174 |  -3.513814 | 0.0055959 |
+| WW + phagemid + bleach    | TRUE      | (Intercept) |  4.3339145 | 0.2265403 |  19.130880 | 0.0000000 |
+| WW + phagemid + bleach    | TRUE      | timepoint   | -0.4668962 | 0.1210909 |  -3.855751 | 0.0031822 |
+| TBS + phagemid            | TRUE      | (Intercept) |  6.8619033 | 0.0210399 | 326.137321 | 0.0000000 |
+| TBS + phagemid            | TRUE      | timepoint   | -0.0336933 | 0.0112463 |  -2.995946 | 0.0134364 |
 
 Collapsing the qPCR replicates increases the standard error of the
 regression coefficients:
@@ -607,6 +615,6 @@ rbind(models, models_collapsed) |>
   geom_point()
 ```
 
-![](qpcr_analysis_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
+![](qpcr_analysis_files/figure-gfm/unnamed-chunk-23-1.png)<!-- -->
 
 ## Hierarchical model \[TODO\]
