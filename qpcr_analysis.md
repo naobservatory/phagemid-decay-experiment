@@ -16,6 +16,7 @@ library(tidyverse)
 
 ``` r
 library(readxl)
+library(broom)
 ```
 
 # Ingest data
@@ -436,6 +437,20 @@ It looks like there is sometimes significantly more variation between
 technical replicates than PCR replicates. This suggests that we may want
 to use a hierarchical model of the error.
 
+# Regression analysis
+
+In this section, we’ll look at the trends in concentration over time.
+First, we’ll make the approximation that all of the qPCR measurements
+for a `(treatment_group, timepoint)` pair are independent. This is not
+exactly true because the qPCR replicates of the same technical replicate
+share the noise of the technical replicate. Thus, the error bars on
+these estimates will be too optimistic. Next, we’ll make the opposite
+approximation: that the mean of the qPCR replicates is a single
+observation. In the future, we’ll look at a hierarchical model that
+incorporates the dependency structure of the measurements.
+
+## Treating all observations as independent
+
 We can use a Loess curve to see the trend for each treatment:
 
 ``` r
@@ -593,97 +608,100 @@ data_concentration |>
 
 ![](qpcr_analysis_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
 
+``` r
+models <- treatments_to_keep |> 
+  map(~ filter(data_concentration, treatment_group == .)) |>
+  map(~ lm(log_concentration ~ timepoint, .)) |>
+  map(tidy) |>
+  map2(
+    treatments_to_keep,
+    ~ mutate(.x, treatment_group=.y, collapsed=FALSE, .before=1)
+    ) |> 
+  list_rbind()
+models
+```
+
+    ## # A tibble: 8 × 7
+    ##   treatment_group collapsed term        estimate std.error statistic  p.value
+    ##   <chr>           <lgl>     <chr>          <dbl>     <dbl>     <dbl>    <dbl>
+    ## 1 A               FALSE     (Intercept) 15.0        0.0784   192.    3.68e-53
+    ## 2 A               FALSE     timepoint   -0.00741    0.0419    -0.177 8.61e- 1
+    ## 3 B               FALSE     (Intercept) 15.0        0.153     98.5   2.29e-43
+    ## 4 B               FALSE     timepoint   -0.523      0.0816    -6.41  2.56e- 7
+    ## 5 C               FALSE     (Intercept) 15.8        0.0343   461.    4.08e-66
+    ## 6 C               FALSE     timepoint   -0.0776     0.0183    -4.23  1.66e- 4
+    ## 7 D               FALSE     (Intercept)  9.98       0.286     34.8   3.44e-28
+    ## 8 D               FALSE     timepoint   -1.08       0.153     -7.02  4.18e- 8
+
+## Collapsing qPCR replicates
+
+Now, we create a new table that collapses the qPCR replicates:
+
+``` r
+data_collapsed <- data_concentration |> 
+  group_by(treatment_group, timepoint) |>
+  summarise(log_concentration = mean(log_concentration), .groups="drop")
+```
+
+The Loess smoother is uninteresting because it will just draw a curve
+through the points with no error.
+
+On the other hand, we now have much wider error bars on our linear
+estimates. Just as the independent approximation meant that the errors
+were too optimistic, this approximation is too conservative.
+
+``` r
+data_collapsed |>
+  ggplot(aes(timepoint, log_concentration, color=treatment_group)) +
+  geom_point() +
+  geom_smooth(
+    method = "lm"
+  )
+```
+
+    ## `geom_smooth()` using formula = 'y ~ x'
+
+![](qpcr_analysis_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
+
 We can fit linear models separately for each timepoint and examine the
 coefficients and standard errors:
 
 ``` r
-treatments_to_keep |> 
-  map(~ filter(data_concentration, treatment_group == .)) |>
+models_collapsed <- treatments_to_keep |> 
+  map(~ filter(data_collapsed, treatment_group == .)) |>
   map(~ lm(log_concentration ~ timepoint, .)) |>
-  map(summary)
+  map(tidy) |>
+  map2(
+    treatments_to_keep,
+    ~ mutate(.x, treatment_group=.y, collapsed=TRUE, .before=1)
+    ) |> 
+  list_rbind() 
+models_collapsed
 ```
 
-    ## [[1]]
-    ## 
-    ## Call:
-    ## lm(formula = log_concentration ~ timepoint, data = .)
-    ## 
-    ## Residuals:
-    ##     Min      1Q  Median      3Q     Max 
-    ## -0.5397 -0.2354  0.0135  0.2328  0.4078 
-    ## 
-    ## Coefficients:
-    ##              Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept) 15.007160   0.078359 191.518   <2e-16 ***
-    ## timepoint   -0.007412   0.041885  -0.177    0.861    
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-    ## 
-    ## Residual standard error: 0.281 on 34 degrees of freedom
-    ## Multiple R-squared:  0.0009202,  Adjusted R-squared:  -0.02846 
-    ## F-statistic: 0.03131 on 1 and 34 DF,  p-value: 0.8606
-    ## 
-    ## 
-    ## [[2]]
-    ## 
-    ## Call:
-    ## lm(formula = log_concentration ~ timepoint, data = .)
-    ## 
-    ## Residuals:
-    ##      Min       1Q   Median       3Q      Max 
-    ## -1.43064 -0.14962 -0.00521  0.33496  0.94550 
-    ## 
-    ## Coefficients:
-    ##             Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)  15.0443     0.1527  98.548  < 2e-16 ***
-    ## timepoint    -0.5228     0.0816  -6.407 2.56e-07 ***
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-    ## 
-    ## Residual standard error: 0.5474 on 34 degrees of freedom
-    ## Multiple R-squared:  0.547,  Adjusted R-squared:  0.5336 
-    ## F-statistic: 41.05 on 1 and 34 DF,  p-value: 2.563e-07
-    ## 
-    ## 
-    ## [[3]]
-    ## 
-    ## Call:
-    ## lm(formula = log_concentration ~ timepoint, data = .)
-    ## 
-    ## Residuals:
-    ##      Min       1Q   Median       3Q      Max 
-    ## -0.40726 -0.06453  0.03276  0.09378  0.18023 
-    ## 
-    ## Coefficients:
-    ##             Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept) 15.80012    0.03430 460.711  < 2e-16 ***
-    ## timepoint   -0.07758    0.01833  -4.232 0.000166 ***
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-    ## 
-    ## Residual standard error: 0.123 on 34 degrees of freedom
-    ## Multiple R-squared:  0.345,  Adjusted R-squared:  0.3258 
-    ## F-statistic: 17.91 on 1 and 34 DF,  p-value: 0.0001657
-    ## 
-    ## 
-    ## [[4]]
-    ## 
-    ## Call:
-    ## lm(formula = log_concentration ~ timepoint, data = .)
-    ## 
-    ## Residuals:
-    ##      Min       1Q   Median       3Q      Max 
-    ## -1.71874 -0.72227  0.00817  1.02115  1.23386 
-    ## 
-    ## Coefficients:
-    ##             Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)   9.9792     0.2864  34.846  < 2e-16 ***
-    ## timepoint    -1.0751     0.1531  -7.023 4.18e-08 ***
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-    ## 
-    ## Residual standard error: 1.027 on 34 degrees of freedom
-    ## Multiple R-squared:  0.592,  Adjusted R-squared:   0.58 
-    ## F-statistic: 49.32 on 1 and 34 DF,  p-value: 4.178e-08
+    ## # A tibble: 8 × 7
+    ##   treatment_group collapsed term        estimate std.error statistic   p.value
+    ##   <chr>           <lgl>     <chr>          <dbl>     <dbl>     <dbl>     <dbl>
+    ## 1 A               TRUE      (Intercept) 15.0        0.186    80.7    0.000153 
+    ## 2 A               TRUE      timepoint   -0.00741    0.0994   -0.0746 0.947    
+    ## 3 B               TRUE      (Intercept) 15.0        0.473    31.8    0.000985 
+    ## 4 B               TRUE      timepoint   -0.523      0.253    -2.07   0.174    
+    ## 5 C               TRUE      (Intercept) 15.8        0.0995  159.     0.0000396
+    ## 6 C               TRUE      timepoint   -0.0776     0.0532   -1.46   0.282    
+    ## 7 D               TRUE      (Intercept)  9.98       1.10      9.08   0.0119   
+    ## 8 D               TRUE      timepoint   -1.08       0.587    -1.83   0.209
 
-TODO: pass the treatment group along the pipe
+Collapsing the qPCR replicates increases the standard error of the
+regression coefficients:
+
+``` r
+rbind(models, models_collapsed) |> 
+  filter(term == "timepoint") |> 
+  ggplot(aes(collapsed, std.error, group=treatment_group)) +
+  geom_line(aes(linetype = treatment_group)) +
+  geom_point()
+```
+
+![](qpcr_analysis_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
+
+## Hierarchical model \[TODO\]

@@ -6,6 +6,7 @@ output: github_document
 ```{r}
 library(tidyverse)
 library(readxl)
+library(broom)
 ```
 
 # Ingest data
@@ -255,6 +256,17 @@ data_concentration |>
 It looks like there is sometimes significantly more variation between technical replicates than PCR replicates.
 This suggests that we may want to use a hierarchical model of the error.
 
+# Regression analysis
+
+In this section, we'll look at the trends in concentration over time.
+First, we'll make the approximation that all of the qPCR measurements for a `(treatment_group, timepoint)` pair are independent.
+This is not exactly true because the qPCR replicates of the same technical replicate share the noise of the technical replicate.
+Thus, the error bars on these estimates will be too optimistic.
+Next, we'll make the opposite approximation: that the mean of the qPCR replicates is a single observation.
+In the future, we'll look at a hierarchical model that incorporates the dependency structure of the measurements.
+
+## Treating all observations as independent
+
 We can use a Loess curve to see the trend for each treatment:
 ```{r}
 data_concentration |>
@@ -273,13 +285,63 @@ data_concentration |>
   )
 ```
 
+```{r}
+models <- treatments_to_keep |> 
+  map(~ filter(data_concentration, treatment_group == .)) |>
+  map(~ lm(log_concentration ~ timepoint, .)) |>
+  map(tidy) |>
+  map2(
+    treatments_to_keep,
+    ~ mutate(.x, treatment_group=.y, collapsed=FALSE, .before=1)
+    ) |> 
+  list_rbind()
+models
+```
+
+## Collapsing qPCR replicates
+
+Now, we create a new table that collapses the qPCR replicates:
+```{r}
+data_collapsed <- data_concentration |> 
+  group_by(treatment_group, timepoint) |>
+  summarise(log_concentration = mean(log_concentration), .groups="drop")
+```
+
+The Loess smoother is uninteresting because it will just draw a curve through the points with no error.
+
+On the other hand, we now have much wider error bars on our linear estimates.
+Just as the independent approximation meant that the errors were too optimistic, this approximation is too conservative.
+```{r}
+data_collapsed |>
+  ggplot(aes(timepoint, log_concentration, color=treatment_group)) +
+  geom_point() +
+  geom_smooth(
+    method = "lm"
+  )
+```
+
 We can fit linear models separately for each timepoint and examine the coefficients and standard errors:
 
 ```{r}
-treatments_to_keep |> 
-  map(~ filter(data_concentration, treatment_group == .)) |>
+models_collapsed <- treatments_to_keep |> 
+  map(~ filter(data_collapsed, treatment_group == .)) |>
   map(~ lm(log_concentration ~ timepoint, .)) |>
-  map(summary)
+  map(tidy) |>
+  map2(
+    treatments_to_keep,
+    ~ mutate(.x, treatment_group=.y, collapsed=TRUE, .before=1)
+    ) |> 
+  list_rbind() 
+models_collapsed
 ```
 
-TODO: pass the treatment group along the pipe
+Collapsing the qPCR replicates increases the standard error of the regression coefficients:
+```{r}
+rbind(models, models_collapsed) |> 
+  filter(term == "timepoint") |> 
+  ggplot(aes(collapsed, std.error, group=treatment_group)) +
+  geom_line(aes(linetype = treatment_group)) +
+  geom_point()
+```
+
+## Hierarchical model [TODO]
