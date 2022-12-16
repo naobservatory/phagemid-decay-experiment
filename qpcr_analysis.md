@@ -166,9 +166,20 @@ We will use regular expressions to match the expected pattern, which is:
 In our input data, the non-template control was named “B1_NTC”, which
 will break our naming scheme. We’ll rename it to “NTC” first.
 
-TODO: Convert the treatment group letters to actual names
+Finally, we’ll rename the single-letter treatment groups with more
+informative names and mark the negative controls so we can separate them
+out later.
 
 ``` r
+coding = list(
+  "A" = "WW + phagemid",
+  "B" = "WW + phagemid + detergent",
+  "C" = "TBS + phagemid",
+  "D" = "WW + phagemid + bleach",
+  "E" = "Just WW"
+)
+controls <-  c("Blank", "NTC", "Just WW")
+
 data_tidy <- data_extracted |> 
   mutate(
     sample_name = str_replace(sample_name, "B1_NTC", "NTC")
@@ -186,25 +197,26 @@ data_tidy <- data_extracted |>
     too_few = "align_start"
   ) |> 
   mutate(
-    treatment_group = as.factor(treatment_group),
+    treatment_group = recode(treatment_group, !!!coding),
+    control = treatment_group %in% controls,
     timepoint = as.integer(timepoint),
     tech_rep = as.factor(tech_rep)
   )
 kable(head(data_tidy, n = 10))
 ```
 
-|       ct | treatment_group | timepoint | tech_rep | well_position | ct_threshold | auto_ct_threshold | target_name    |
-|---------:|:----------------|----------:|:---------|:--------------|-------------:|:------------------|:---------------|
-|       NA | Blank           |        NA | NA       | A1            |          0.2 | FALSE             | Blank          |
-|       NA | Blank           |        NA | NA       | A2            |          0.2 | FALSE             | Blank          |
-|       NA | Blank           |        NA | NA       | A3            |          0.2 | FALSE             | Blank          |
-| 35.92194 | NTC             |        NA | NA       | B1            |          0.2 | FALSE             | Barcode_1\_NTC |
-|       NA | NTC             |        NA | NA       | B2            |          0.2 | FALSE             | Barcode_1\_NTC |
-| 36.77825 | NTC             |        NA | NA       | B3            |          0.2 | FALSE             | Barcode_1\_NTC |
-| 20.32065 | A               |         0 | 1        | C1            |          0.2 | FALSE             | Barcode_1      |
-| 19.76434 | A               |         0 | 2        | C2            |          0.2 | FALSE             | Barcode_1      |
-| 18.81370 | A               |         0 | 3        | C3            |          0.2 | FALSE             | Barcode_1      |
-| 18.81602 | A               |         1 | 1        | C4            |          0.2 | FALSE             | Barcode_1      |
+|       ct | treatment_group | timepoint | tech_rep | well_position | ct_threshold | auto_ct_threshold | target_name    | control |
+|---------:|:----------------|----------:|:---------|:--------------|-------------:|:------------------|:---------------|:--------|
+|       NA | Blank           |        NA | NA       | A1            |          0.2 | FALSE             | Blank          | TRUE    |
+|       NA | Blank           |        NA | NA       | A2            |          0.2 | FALSE             | Blank          | TRUE    |
+|       NA | Blank           |        NA | NA       | A3            |          0.2 | FALSE             | Blank          | TRUE    |
+| 35.92194 | NTC             |        NA | NA       | B1            |          0.2 | FALSE             | Barcode_1\_NTC | TRUE    |
+|       NA | NTC             |        NA | NA       | B2            |          0.2 | FALSE             | Barcode_1\_NTC | TRUE    |
+| 36.77825 | NTC             |        NA | NA       | B3            |          0.2 | FALSE             | Barcode_1\_NTC | TRUE    |
+| 20.32065 | WW + phagemid   |         0 | 1        | C1            |          0.2 | FALSE             | Barcode_1      | FALSE   |
+| 19.76434 | WW + phagemid   |         0 | 2        | C2            |          0.2 | FALSE             | Barcode_1      | FALSE   |
+| 18.81370 | WW + phagemid   |         0 | 3        | C3            |          0.2 | FALSE             | Barcode_1      | FALSE   |
+| 18.81602 | WW + phagemid   |         1 | 1        | C4            |          0.2 | FALSE             | Barcode_1      | FALSE   |
 
 Let’s make sure we have 9 blanks and NTCs (3 per plate) and 36 of the
 other treatments (3 pcr replicates \* 3 technical replicates \* 4
@@ -217,15 +229,15 @@ data_tidy |>
   kable()
 ```
 
-| treatment_group |   n |
-|:----------------|----:|
-| A               |  36 |
-| B               |  36 |
-| Blank           |   9 |
-| C               |  36 |
-| D               |  36 |
-| E               |  36 |
-| NTC             |   9 |
+| treatment_group           |   n |
+|:--------------------------|----:|
+| Blank                     |   9 |
+| Just WW                   |  36 |
+| NTC                       |   9 |
+| TBS + phagemid            |  36 |
+| WW + phagemid             |  36 |
+| WW + phagemid + bleach    |  36 |
+| WW + phagemid + detergent |  36 |
 
 First, let’s take a look at the Blanks and NTCs. These should mostly
 have `NA` for their ct value.
@@ -236,32 +248,32 @@ data_tidy |>
   kable()
 ```
 
-|        ct | treatment_group | timepoint | tech_rep | well_position | ct_threshold | auto_ct_threshold | target_name    |
-|----------:|:----------------|----------:|:---------|:--------------|-------------:|:------------------|:---------------|
-|        NA | Blank           |        NA | NA       | A1            |          0.2 | FALSE             | Blank          |
-|        NA | Blank           |        NA | NA       | A2            |          0.2 | FALSE             | Blank          |
-|        NA | Blank           |        NA | NA       | A3            |          0.2 | FALSE             | Blank          |
-| 35.921940 | NTC             |        NA | NA       | B1            |          0.2 | FALSE             | Barcode_1\_NTC |
-|        NA | NTC             |        NA | NA       | B2            |          0.2 | FALSE             | Barcode_1\_NTC |
-| 36.778248 | NTC             |        NA | NA       | B3            |          0.2 | FALSE             | Barcode_1\_NTC |
-| 33.499622 | Blank           |        NA | NA       | A1            |          0.2 | FALSE             | Blank          |
-|        NA | Blank           |        NA | NA       | A2            |          0.2 | FALSE             | Blank          |
-|  6.357395 | Blank           |        NA | NA       | A3            |          0.2 | FALSE             | Blank          |
-|        NA | NTC             |        NA | NA       | B1            |          0.2 | FALSE             | Barcode_1\_NTC |
-|        NA | NTC             |        NA | NA       | B2            |          0.2 | FALSE             | Barcode_1\_NTC |
-|        NA | NTC             |        NA | NA       | B3            |          0.2 | FALSE             | Barcode_1\_NTC |
-|        NA | Blank           |        NA | NA       | A1            |          0.2 | FALSE             | Blank          |
-|        NA | Blank           |        NA | NA       | A2            |          0.2 | FALSE             | Blank          |
-|        NA | Blank           |        NA | NA       | A3            |          0.2 | FALSE             | Blank          |
-| 39.660065 | NTC             |        NA | NA       | B1            |          0.2 | FALSE             | Barcode_1\_NTC |
-|        NA | NTC             |        NA | NA       | B2            |          0.2 | FALSE             | Barcode_1\_NTC |
-| 37.288032 | NTC             |        NA | NA       | B3            |          0.2 | FALSE             | Barcode_1\_NTC |
+|        ct | treatment_group | timepoint | tech_rep | well_position | ct_threshold | auto_ct_threshold | target_name    | control |
+|----------:|:----------------|----------:|:---------|:--------------|-------------:|:------------------|:---------------|:--------|
+|        NA | Blank           |        NA | NA       | A1            |          0.2 | FALSE             | Blank          | TRUE    |
+|        NA | Blank           |        NA | NA       | A2            |          0.2 | FALSE             | Blank          | TRUE    |
+|        NA | Blank           |        NA | NA       | A3            |          0.2 | FALSE             | Blank          | TRUE    |
+| 35.921940 | NTC             |        NA | NA       | B1            |          0.2 | FALSE             | Barcode_1\_NTC | TRUE    |
+|        NA | NTC             |        NA | NA       | B2            |          0.2 | FALSE             | Barcode_1\_NTC | TRUE    |
+| 36.778248 | NTC             |        NA | NA       | B3            |          0.2 | FALSE             | Barcode_1\_NTC | TRUE    |
+| 33.499622 | Blank           |        NA | NA       | A1            |          0.2 | FALSE             | Blank          | TRUE    |
+|        NA | Blank           |        NA | NA       | A2            |          0.2 | FALSE             | Blank          | TRUE    |
+|  6.357395 | Blank           |        NA | NA       | A3            |          0.2 | FALSE             | Blank          | TRUE    |
+|        NA | NTC             |        NA | NA       | B1            |          0.2 | FALSE             | Barcode_1\_NTC | TRUE    |
+|        NA | NTC             |        NA | NA       | B2            |          0.2 | FALSE             | Barcode_1\_NTC | TRUE    |
+|        NA | NTC             |        NA | NA       | B3            |          0.2 | FALSE             | Barcode_1\_NTC | TRUE    |
+|        NA | Blank           |        NA | NA       | A1            |          0.2 | FALSE             | Blank          | TRUE    |
+|        NA | Blank           |        NA | NA       | A2            |          0.2 | FALSE             | Blank          | TRUE    |
+|        NA | Blank           |        NA | NA       | A3            |          0.2 | FALSE             | Blank          | TRUE    |
+| 39.660065 | NTC             |        NA | NA       | B1            |          0.2 | FALSE             | Barcode_1\_NTC | TRUE    |
+|        NA | NTC             |        NA | NA       | B2            |          0.2 | FALSE             | Barcode_1\_NTC | TRUE    |
+| 37.288032 | NTC             |        NA | NA       | B3            |          0.2 | FALSE             | Barcode_1\_NTC | TRUE    |
 
 We can make a boxplot to compare the distribution of ct across
 treatments. To disply the NAs, we’ll set them to one more than the
-maximum possible values. We see that the Blanks, NTCs, and treatment E
-(which is some sort of negative control?) have CT \> 35, with a few
-outliers. We’ll probably want to check those at some point.
+maximum possible values. We see that the Blanks, NTCs, and Just WW have
+CT \> 35, with a few outliers. We’ll probably want to check those at
+some point.
 
 ``` r
 ct_max <- max(data_tidy$ct, na.rm = TRUE) + 1
@@ -309,9 +321,8 @@ this into one conversion.
 We’re also going to filter out the negative controls from now on.
 
 ``` r
-treatments_to_keep <- c("A", "B", "C", "D")
 data_concentration <- data_tidy |>
-  filter(treatment_group %in% treatments_to_keep) |>
+  filter(!control) |>
   mutate(
     dilution = (ct - std_curve_intercept) / std_curve_slope,
     log_concentration = log(concentration_at_d0) + log(dilution_factor) * dilution,
@@ -319,18 +330,18 @@ data_concentration <- data_tidy |>
 kable(head(data_concentration, n = 10))
 ```
 
-|       ct | treatment_group | timepoint | tech_rep | well_position | ct_threshold | auto_ct_threshold | target_name | dilution | log_concentration |
-|---------:|:----------------|----------:|:---------|:--------------|-------------:|:------------------|:------------|---------:|------------------:|
-| 20.32065 | A               |         0 | 1        | C1            |          0.2 | FALSE             | Barcode_1   | 6.288793 |          14.46750 |
-| 19.76434 | A               |         0 | 2        | C2            |          0.2 | FALSE             | Barcode_1   | 6.439739 |          14.81506 |
-| 18.81370 | A               |         0 | 3        | C3            |          0.2 | FALSE             | Barcode_1   | 6.697681 |          15.40900 |
-| 18.81602 | A               |         1 | 1        | C4            |          0.2 | FALSE             | Barcode_1   | 6.697049 |          15.40754 |
-| 19.44741 | A               |         1 | 2        | C5            |          0.2 | FALSE             | Barcode_1   | 6.525733 |          15.01307 |
-| 19.54228 | A               |         1 | 3        | C6            |          0.2 | FALSE             | Barcode_1   | 6.499993 |          14.95380 |
-| 18.98299 | A               |         2 | 1        | C7            |          0.2 | FALSE             | Barcode_1   | 6.651747 |          15.30323 |
-| 18.98078 | A               |         2 | 2        | C8            |          0.2 | FALSE             | Barcode_1   | 6.652345 |          15.30461 |
-| 19.66541 | A               |         2 | 3        | C9            |          0.2 | FALSE             | Barcode_1   | 6.466582 |          14.87687 |
-| 20.02242 | A               |         3 | 1        | C10           |          0.2 | FALSE             | Barcode_1   | 6.369714 |          14.65382 |
+|       ct | treatment_group | timepoint | tech_rep | well_position | ct_threshold | auto_ct_threshold | target_name | control | dilution | log_concentration |
+|---------:|:----------------|----------:|:---------|:--------------|-------------:|:------------------|:------------|:--------|---------:|------------------:|
+| 20.32065 | WW + phagemid   |         0 | 1        | C1            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.288793 |          14.46750 |
+| 19.76434 | WW + phagemid   |         0 | 2        | C2            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.439739 |          14.81506 |
+| 18.81370 | WW + phagemid   |         0 | 3        | C3            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.697681 |          15.40900 |
+| 18.81602 | WW + phagemid   |         1 | 1        | C4            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.697049 |          15.40754 |
+| 19.44741 | WW + phagemid   |         1 | 2        | C5            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.525733 |          15.01307 |
+| 19.54228 | WW + phagemid   |         1 | 3        | C6            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.499993 |          14.95380 |
+| 18.98299 | WW + phagemid   |         2 | 1        | C7            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.651747 |          15.30323 |
+| 18.98078 | WW + phagemid   |         2 | 2        | C8            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.652345 |          15.30461 |
+| 19.66541 | WW + phagemid   |         2 | 3        | C9            |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.466582 |          14.87687 |
+| 20.02242 | WW + phagemid   |         3 | 1        | C10           |          0.2 | FALSE             | Barcode_1   | FALSE   | 6.369714 |          14.65382 |
 
 Since we have three PCR replicates per technical replicate, we can
 summarize our data with min, median, and max without any loss of
@@ -348,56 +359,56 @@ data_concentration |>
   kable()
 ```
 
-| treatment_group | timepoint | tech_rep |  conc_min |  conc_med |  conc_max |
-|:----------------|----------:|:---------|----------:|----------:|----------:|
-| A               |         0 | 1        | 14.467498 | 14.539121 | 14.559697 |
-| A               |         0 | 2        | 14.704875 | 14.752250 | 14.815063 |
-| A               |         0 | 3        | 15.020836 | 15.360500 | 15.408997 |
-| A               |         1 | 1        | 15.315593 | 15.392311 | 15.407542 |
-| A               |         1 | 2        | 15.013071 | 15.123416 | 15.193376 |
-| A               |         1 | 3        | 14.953803 | 14.979106 | 15.100242 |
-| A               |         2 | 1        | 15.222434 | 15.233419 | 15.303230 |
-| A               |         2 | 2        | 15.183994 | 15.304607 | 15.330360 |
-| A               |         2 | 3        | 14.873419 | 14.876872 | 14.948056 |
-| A               |         3 | 1        | 14.631852 | 14.651272 | 14.653825 |
-| A               |         3 | 2        | 14.742572 | 14.751832 | 14.800324 |
-| A               |         3 | 3        | 15.042985 | 15.098861 | 15.100316 |
-| B               |         0 | 1        | 14.691215 | 14.707181 | 14.723714 |
-| B               |         0 | 2        | 14.937496 | 14.981082 | 14.986873 |
-| B               |         0 | 3        | 14.630075 | 14.772313 | 14.884848 |
-| B               |         1 | 1        | 14.460672 | 14.507884 | 14.530743 |
-| B               |         1 | 2        | 14.431200 | 14.524827 | 14.569874 |
-| B               |         1 | 3        | 14.375207 | 14.747474 | 14.834689 |
-| B               |         2 | 1        | 14.445850 | 14.506649 | 14.514520 |
-| B               |         2 | 2        | 14.399098 | 14.540501 | 14.597506 |
-| B               |         2 | 3        | 14.829546 | 14.885799 | 14.944224 |
-| B               |         3 | 1        | 13.393890 | 13.420946 | 13.479134 |
-| B               |         3 | 2        | 13.508365 | 13.536396 | 13.662985 |
-| B               |         3 | 3        | 12.045272 | 12.175395 | 12.181063 |
-| C               |         0 | 1        | 15.585203 | 15.730980 | 15.774331 |
-| C               |         0 | 2        | 15.640385 | 15.744967 | 15.827471 |
-| C               |         0 | 3        | 15.392854 | 15.860508 | 15.891046 |
-| C               |         1 | 1        | 15.766611 | 15.774405 | 15.815867 |
-| C               |         1 | 2        | 15.799626 | 15.835428 | 15.892060 |
-| C               |         1 | 3        | 15.766942 | 15.780796 | 15.817647 |
-| C               |         2 | 1        | 15.630437 | 15.666167 | 15.683122 |
-| C               |         2 | 2        | 15.748995 | 15.762468 | 15.825183 |
-| C               |         2 | 3        | 15.745316 | 15.745680 | 15.763973 |
-| C               |         3 | 1        | 15.471512 | 15.509831 | 15.526576 |
-| C               |         3 | 2        | 15.490110 | 15.504371 | 15.567375 |
-| C               |         3 | 3        | 15.388014 | 15.439595 | 15.448920 |
-| D               |         0 | 1        | 11.023879 | 11.052359 | 11.103619 |
-| D               |         0 | 2        | 10.819916 | 10.849192 | 11.061266 |
-| D               |         0 | 3        | 10.687431 | 11.142662 | 11.213070 |
-| D               |         1 | 1        |  7.185397 |  7.231021 |  7.245195 |
-| D               |         1 | 2        |  7.247885 |  7.276237 |  7.328588 |
-| D               |         1 | 3        |  7.880027 |  8.045826 |  8.107687 |
-| D               |         2 | 1        |  7.131532 |  7.219262 |  7.287010 |
-| D               |         2 | 2        |  7.770489 |  7.813055 |  7.832202 |
-| D               |         2 | 3        |  7.650187 |  7.672781 |  7.842286 |
-| D               |         3 | 1        |  7.398282 |  7.554920 |  7.801422 |
-| D               |         3 | 2        |  6.148432 |  6.912249 |  7.093166 |
-| D               |         3 | 3        |  7.767307 |  7.889023 |  7.912897 |
+| treatment_group           | timepoint | tech_rep |  conc_min |  conc_med |  conc_max |
+|:--------------------------|----------:|:---------|----------:|----------:|----------:|
+| TBS + phagemid            |         0 | 1        | 15.585203 | 15.730980 | 15.774331 |
+| TBS + phagemid            |         0 | 2        | 15.640385 | 15.744967 | 15.827471 |
+| TBS + phagemid            |         0 | 3        | 15.392854 | 15.860508 | 15.891046 |
+| TBS + phagemid            |         1 | 1        | 15.766611 | 15.774405 | 15.815867 |
+| TBS + phagemid            |         1 | 2        | 15.799626 | 15.835428 | 15.892060 |
+| TBS + phagemid            |         1 | 3        | 15.766942 | 15.780796 | 15.817647 |
+| TBS + phagemid            |         2 | 1        | 15.630437 | 15.666167 | 15.683122 |
+| TBS + phagemid            |         2 | 2        | 15.748995 | 15.762468 | 15.825183 |
+| TBS + phagemid            |         2 | 3        | 15.745316 | 15.745680 | 15.763973 |
+| TBS + phagemid            |         3 | 1        | 15.471512 | 15.509831 | 15.526576 |
+| TBS + phagemid            |         3 | 2        | 15.490110 | 15.504371 | 15.567375 |
+| TBS + phagemid            |         3 | 3        | 15.388014 | 15.439595 | 15.448920 |
+| WW + phagemid             |         0 | 1        | 14.467498 | 14.539121 | 14.559697 |
+| WW + phagemid             |         0 | 2        | 14.704875 | 14.752250 | 14.815063 |
+| WW + phagemid             |         0 | 3        | 15.020836 | 15.360500 | 15.408997 |
+| WW + phagemid             |         1 | 1        | 15.315593 | 15.392311 | 15.407542 |
+| WW + phagemid             |         1 | 2        | 15.013071 | 15.123416 | 15.193376 |
+| WW + phagemid             |         1 | 3        | 14.953803 | 14.979106 | 15.100242 |
+| WW + phagemid             |         2 | 1        | 15.222434 | 15.233419 | 15.303230 |
+| WW + phagemid             |         2 | 2        | 15.183994 | 15.304607 | 15.330360 |
+| WW + phagemid             |         2 | 3        | 14.873419 | 14.876872 | 14.948056 |
+| WW + phagemid             |         3 | 1        | 14.631852 | 14.651272 | 14.653825 |
+| WW + phagemid             |         3 | 2        | 14.742572 | 14.751832 | 14.800324 |
+| WW + phagemid             |         3 | 3        | 15.042985 | 15.098861 | 15.100316 |
+| WW + phagemid + bleach    |         0 | 1        | 11.023879 | 11.052359 | 11.103619 |
+| WW + phagemid + bleach    |         0 | 2        | 10.819916 | 10.849192 | 11.061266 |
+| WW + phagemid + bleach    |         0 | 3        | 10.687431 | 11.142662 | 11.213070 |
+| WW + phagemid + bleach    |         1 | 1        |  7.185397 |  7.231021 |  7.245195 |
+| WW + phagemid + bleach    |         1 | 2        |  7.247885 |  7.276237 |  7.328588 |
+| WW + phagemid + bleach    |         1 | 3        |  7.880027 |  8.045826 |  8.107687 |
+| WW + phagemid + bleach    |         2 | 1        |  7.131532 |  7.219262 |  7.287010 |
+| WW + phagemid + bleach    |         2 | 2        |  7.770489 |  7.813055 |  7.832202 |
+| WW + phagemid + bleach    |         2 | 3        |  7.650187 |  7.672781 |  7.842286 |
+| WW + phagemid + bleach    |         3 | 1        |  7.398282 |  7.554920 |  7.801422 |
+| WW + phagemid + bleach    |         3 | 2        |  6.148432 |  6.912249 |  7.093166 |
+| WW + phagemid + bleach    |         3 | 3        |  7.767307 |  7.889023 |  7.912897 |
+| WW + phagemid + detergent |         0 | 1        | 14.691215 | 14.707181 | 14.723714 |
+| WW + phagemid + detergent |         0 | 2        | 14.937496 | 14.981082 | 14.986873 |
+| WW + phagemid + detergent |         0 | 3        | 14.630075 | 14.772313 | 14.884848 |
+| WW + phagemid + detergent |         1 | 1        | 14.460672 | 14.507884 | 14.530743 |
+| WW + phagemid + detergent |         1 | 2        | 14.431200 | 14.524827 | 14.569874 |
+| WW + phagemid + detergent |         1 | 3        | 14.375207 | 14.747474 | 14.834689 |
+| WW + phagemid + detergent |         2 | 1        | 14.445850 | 14.506649 | 14.514520 |
+| WW + phagemid + detergent |         2 | 2        | 14.399098 | 14.540501 | 14.597506 |
+| WW + phagemid + detergent |         2 | 3        | 14.829546 | 14.885799 | 14.944224 |
+| WW + phagemid + detergent |         3 | 1        | 13.393890 | 13.420946 | 13.479134 |
+| WW + phagemid + detergent |         3 | 2        | 13.508365 | 13.536396 | 13.662985 |
+| WW + phagemid + detergent |         3 | 3        | 12.045272 | 12.175395 | 12.181063 |
 
 # Plot log concentrations vs time for each condition
 
@@ -504,6 +515,7 @@ data_concentration |>
 ![](qpcr_analysis_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
 
 ``` r
+treatments_to_keep <- unique(data_concentration$treatment_group) 
 models <- treatments_to_keep |> 
   map(~ filter(data_concentration, treatment_group == .)) |>
   map(~ lm(log_concentration ~ timepoint, .)) |>
@@ -516,16 +528,16 @@ models <- treatments_to_keep |>
 kable(models)
 ```
 
-| treatment_group | collapsed | term        |   estimate | std.error |   statistic |   p.value |
-|:----------------|:----------|:------------|-----------:|----------:|------------:|----------:|
-| A               | FALSE     | (Intercept) | 15.0071602 | 0.0783592 | 191.5175973 | 0.0000000 |
-| A               | FALSE     | timepoint   | -0.0074119 | 0.0418847 |  -0.1769585 | 0.8605909 |
-| B               | FALSE     | (Intercept) | 15.0443407 | 0.1526598 |  98.5481520 | 0.0000000 |
-| B               | FALSE     | timepoint   | -0.5228103 | 0.0816001 |  -6.4069822 | 0.0000003 |
-| C               | FALSE     | (Intercept) | 15.8001163 | 0.0342951 | 460.7106971 | 0.0000000 |
-| C               | FALSE     | timepoint   | -0.0775818 | 0.0183315 |  -4.2321566 | 0.0001657 |
-| D               | FALSE     | (Intercept) |  9.9792068 | 0.2863794 |  34.8461059 | 0.0000000 |
-| D               | FALSE     | timepoint   | -1.0750682 | 0.1530762 |  -7.0230909 | 0.0000000 |
+| treatment_group           | collapsed | term        |   estimate | std.error |   statistic |   p.value |
+|:--------------------------|:----------|:------------|-----------:|----------:|------------:|----------:|
+| WW + phagemid             | FALSE     | (Intercept) | 15.0071602 | 0.0783592 | 191.5175973 | 0.0000000 |
+| WW + phagemid             | FALSE     | timepoint   | -0.0074119 | 0.0418847 |  -0.1769585 | 0.8605909 |
+| WW + phagemid + detergent | FALSE     | (Intercept) | 15.0443407 | 0.1526598 |  98.5481520 | 0.0000000 |
+| WW + phagemid + detergent | FALSE     | timepoint   | -0.5228103 | 0.0816001 |  -6.4069822 | 0.0000003 |
+| WW + phagemid + bleach    | FALSE     | (Intercept) |  9.9792068 | 0.2863794 |  34.8461059 | 0.0000000 |
+| WW + phagemid + bleach    | FALSE     | timepoint   | -1.0750682 | 0.1530762 |  -7.0230909 | 0.0000000 |
+| TBS + phagemid            | FALSE     | (Intercept) | 15.8001163 | 0.0342951 | 460.7106971 | 0.0000000 |
+| TBS + phagemid            | FALSE     | timepoint   | -0.0775818 | 0.0183315 |  -4.2321566 | 0.0001657 |
 
 ## Collapsing qPCR replicates
 
@@ -573,16 +585,16 @@ models_collapsed <- treatments_to_keep |>
 kable(models_collapsed)
 ```
 
-| treatment_group | collapsed | term        |   estimate | std.error |   statistic |   p.value |
-|:----------------|:----------|:------------|-----------:|----------:|------------:|----------:|
-| A               | TRUE      | (Intercept) | 15.0071602 | 0.1858890 |  80.7318212 | 0.0001534 |
-| A               | TRUE      | timepoint   | -0.0074119 | 0.0993619 |  -0.0745946 | 0.9473269 |
-| B               | TRUE      | (Intercept) | 15.0443407 | 0.4725921 |  31.8336698 | 0.0009853 |
-| B               | TRUE      | timepoint   | -0.5228103 | 0.2526111 |  -2.0696254 | 0.1743497 |
-| C               | TRUE      | (Intercept) | 15.8001163 | 0.0994830 | 158.8222377 | 0.0000396 |
-| C               | TRUE      | timepoint   | -0.0775818 | 0.0531759 |  -1.4589646 | 0.2819668 |
-| D               | TRUE      | (Intercept) |  9.9792068 | 1.0988973 |   9.0811095 | 0.0119099 |
-| D               | TRUE      | timepoint   | -1.0750682 | 0.5873853 |  -1.8302607 | 0.2086985 |
+| treatment_group           | collapsed | term        |   estimate | std.error |   statistic |   p.value |
+|:--------------------------|:----------|:------------|-----------:|----------:|------------:|----------:|
+| WW + phagemid             | TRUE      | (Intercept) | 15.0071602 | 0.1858890 |  80.7318212 | 0.0001534 |
+| WW + phagemid             | TRUE      | timepoint   | -0.0074119 | 0.0993619 |  -0.0745946 | 0.9473269 |
+| WW + phagemid + detergent | TRUE      | (Intercept) | 15.0443407 | 0.4725921 |  31.8336698 | 0.0009853 |
+| WW + phagemid + detergent | TRUE      | timepoint   | -0.5228103 | 0.2526111 |  -2.0696254 | 0.1743497 |
+| WW + phagemid + bleach    | TRUE      | (Intercept) |  9.9792068 | 1.0988973 |   9.0811095 | 0.0119099 |
+| WW + phagemid + bleach    | TRUE      | timepoint   | -1.0750682 | 0.5873853 |  -1.8302607 | 0.2086985 |
+| TBS + phagemid            | TRUE      | (Intercept) | 15.8001163 | 0.0994830 | 158.8222377 | 0.0000396 |
+| TBS + phagemid            | TRUE      | timepoint   | -0.0775818 | 0.0531759 |  -1.4589646 | 0.2819668 |
 
 Collapsing the qPCR replicates increases the standard error of the
 regression coefficients:

@@ -101,9 +101,18 @@ We will use regular expressions to match the expected pattern, which is:
 
 In our input data, the non-template control was named "B1_NTC", which will break our naming scheme. We'll rename it to "NTC" first.
 
-TODO: Convert the treatment group letters to actual names
+Finally, we'll rename the single-letter treatment groups with more informative names and mark the negative controls so we can separate them out later.
 
 ```{r}
+coding = list(
+  "A" = "WW + phagemid",
+  "B" = "WW + phagemid + detergent",
+  "C" = "TBS + phagemid",
+  "D" = "WW + phagemid + bleach",
+  "E" = "Just WW"
+)
+controls <-  c("Blank", "NTC", "Just WW")
+
 data_tidy <- data_extracted |> 
   mutate(
     sample_name = str_replace(sample_name, "B1_NTC", "NTC")
@@ -121,7 +130,8 @@ data_tidy <- data_extracted |>
     too_few = "align_start"
   ) |> 
   mutate(
-    treatment_group = as.factor(treatment_group),
+    treatment_group = recode(treatment_group, !!!coding),
+    control = treatment_group %in% controls,
     timepoint = as.integer(timepoint),
     tech_rep = as.factor(tech_rep)
   )
@@ -145,7 +155,7 @@ data_tidy |>
 
 We can make a boxplot to compare the distribution of ct across treatments.
 To disply the NAs, we'll set them to one more than the maximum possible values.
-We see that the Blanks, NTCs, and treatment E (which is some sort of negative control?) have CT > 35, with a few outliers.
+We see that the Blanks, NTCs, and Just WW have CT > 35, with a few outliers.
 We'll probably want to check those at some point.
 
 ```{r}
@@ -184,9 +194,8 @@ We'll apply the two equations in separate steps so we can compare intermediate v
 We're also going to filter out the negative controls from now on.
 
 ```{r}
-treatments_to_keep <- c("A", "B", "C", "D")
 data_concentration <- data_tidy |>
-  filter(treatment_group %in% treatments_to_keep) |>
+  filter(!control) |>
   mutate(
     dilution = (ct - std_curve_intercept) / std_curve_slope,
     log_concentration = log(concentration_at_d0) + log(dilution_factor) * dilution,
@@ -290,6 +299,7 @@ data_concentration |>
 ```
 
 ```{r}
+treatments_to_keep <- unique(data_concentration$treatment_group) 
 models <- treatments_to_keep |> 
   map(~ filter(data_concentration, treatment_group == .)) |>
   map(~ lm(log_concentration ~ timepoint, .)) |>
