@@ -409,9 +409,8 @@ data_concentration |>
   ggplot(
     aes(timepoint, log_concentration, shape = treatment_group, color = treatment_group)
     ) +
-  geom_jitter(
-    height = 0,
-    width = 0.1
+  geom_point(
+    position = position_jitter(height = 0, width = 0.1, seed = 3579237)
   )
 ```
 
