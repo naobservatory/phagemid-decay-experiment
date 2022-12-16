@@ -521,7 +521,7 @@ data_concentration |>
 # TODO: Make this function more generic
 fit_lm_by_treatment <- function(data){
   treatments <- unique(data$treatment_group) 
-  models <- treatments |> 
+  treatments |> 
     map(~ filter(data, treatment_group == .)) |>
     map(~ lm(log10_concentration ~ timepoint, .)) |>
     map(tidy) |>
