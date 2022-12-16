@@ -17,6 +17,7 @@ library(tidyverse)
 ``` r
 library(readxl)
 library(broom)
+library(knitr)
 ```
 
 # Ingest data
@@ -56,29 +57,21 @@ data_raw <- list.files(
   ) |>
   map(read_qpcr_excel) |> 
   list_rbind()
-show(data_raw)
+kable(head(data_raw, n = 10))
 ```
 
-    ## # A tibble: 198 × 34
-    ##     Well Well Positi…¹ Omit  Sampl…² Targe…³ Task  Repor…⁴ Quenc…⁵ CT    Ct Me…⁶
-    ##    <dbl> <chr>         <lgl> <chr>   <chr>   <chr> <chr>   <chr>   <chr>   <dbl>
-    ##  1     1 A1            FALSE Blank   Blank   UNKN… FAM     NFQ-MGB Unde…    NA  
-    ##  2     2 A2            FALSE Blank   Blank   UNKN… FAM     NFQ-MGB Unde…    NA  
-    ##  3     3 A3            FALSE Blank   Blank   UNKN… FAM     NFQ-MGB Unde…    NA  
-    ##  4    13 B1            FALSE B1_NTC  Barcod… UNKN… FAM     NFQ-MGB 35.9…    36.4
-    ##  5    14 B2            FALSE B1_NTC  Barcod… UNKN… FAM     NFQ-MGB Unde…    36.4
-    ##  6    15 B3            FALSE B1_NTC  Barcod… UNKN… FAM     NFQ-MGB 36.7…    36.4
-    ##  7    25 C1            FALSE A0.1    Barcod… UNKN… FAM     NFQ-MGB 20.3…    20.2
-    ##  8    26 C2            FALSE A0.2    Barcod… UNKN… FAM     NFQ-MGB 19.7…    19.9
-    ##  9    27 C3            FALSE A0.3    Barcod… UNKN… FAM     NFQ-MGB 18.8…    19.0
-    ## 10    28 C4            FALSE A1.1    Barcod… UNKN… FAM     NFQ-MGB 18.8…    18.9
-    ## # … with 188 more rows, 24 more variables: `Ct SD` <dbl>, Quantity <lgl>,
-    ## #   `Quantity Mean` <lgl>, `Quantity SD` <lgl>, `Y-Intercept` <lgl>,
-    ## #   `R(superscript 2)` <lgl>, Slope <lgl>, Efficiency <lgl>,
-    ## #   `Automatic Ct Threshold` <lgl>, `Ct Threshold` <dbl>,
-    ## #   `Automatic Baseline` <lgl>, `Baseline Start` <dbl>, `Baseline End` <dbl>,
-    ## #   `Amp Status` <chr>, Comments <lgl>, `Cq Conf` <dbl>, `Target Color` <chr>,
-    ## #   CQCONF <chr>, EXPFAIL <chr>, HIGHSD <chr>, NOAMP <chr>, NOISE <chr>, …
+| Well | Well Position | Omit  | Sample Name | Target Name    | Task    | Reporter | Quencher | CT                 |  Ct Mean |     Ct SD | Quantity | Quantity Mean | Quantity SD | Y-Intercept | R(superscript 2) | Slope | Efficiency | Automatic Ct Threshold | Ct Threshold | Automatic Baseline | Baseline Start | Baseline End | Amp Status   | Comments |   Cq Conf | Target Color   | CQCONF | EXPFAIL | HIGHSD | NOAMP | NOISE | source            | BADROX |
+|-----:|:--------------|:------|:------------|:---------------|:--------|:---------|:---------|:-------------------|---------:|----------:|:---------|:--------------|:------------|:------------|:-----------------|:------|:-----------|:-----------------------|-------------:|:-------------------|---------------:|-------------:|:-------------|:---------|----------:|:---------------|:-------|:--------|:-------|:------|:------|:------------------|:-------|
+|    1 | A1            | FALSE | Blank       | Blank          | UNKNOWN | FAM      | NFQ-MGB  | Undetermined       |       NA |        NA | NA       | NA            | NA          | NA          | NA               | NA    | NA         | FALSE                  |          0.2 | TRUE               |              3 |           15 | No Amp       | NA       | 0.0000000 | RGB(0,139,69)  | Y      | N       | N      | N     | N     | data//Plate 1.xls | NA     |
+|    2 | A2            | FALSE | Blank       | Blank          | UNKNOWN | FAM      | NFQ-MGB  | Undetermined       |       NA |        NA | NA       | NA            | NA          | NA          | NA               | NA    | NA         | FALSE                  |          0.2 | TRUE               |              3 |           22 | No Amp       | NA       | 0.0000000 | RGB(0,139,69)  | Y      | N       | N      | N     | Y     | data//Plate 1.xls | NA     |
+|    3 | A3            | FALSE | Blank       | Blank          | UNKNOWN | FAM      | NFQ-MGB  | Undetermined       |       NA |        NA | NA       | NA            | NA          | NA          | NA               | NA    | NA         | FALSE                  |          0.2 | TRUE               |              3 |           39 | Inconclusive | NA       | 0.0000000 | RGB(0,139,69)  | Y      | Y       | N      | N     | Y     | data//Plate 1.xls | NA     |
+|   13 | B1            | FALSE | B1_NTC      | Barcode_1\_NTC | UNKNOWN | FAM      | NFQ-MGB  | 35.921939849853516 | 36.35009 | 0.6055012 | NA       | NA            | NA          | NA          | NA               | NA    | NA         | FALSE                  |          0.2 | TRUE               |              3 |           30 | Inconclusive | NA       | 0.9320759 | RGB(0,139,69)  | N      | N       | Y      | N     | N     | data//Plate 1.xls | NA     |
+|   14 | B2            | FALSE | B1_NTC      | Barcode_1\_NTC | UNKNOWN | FAM      | NFQ-MGB  | Undetermined       | 36.35009 | 0.6055012 | NA       | NA            | NA          | NA          | NA               | NA    | NA         | FALSE                  |          0.2 | TRUE               |              3 |           39 | No Amp       | NA       | 0.0000000 | RGB(0,139,69)  | Y      | Y       | N      | Y     | N     | data//Plate 1.xls | NA     |
+|   15 | B3            | FALSE | B1_NTC      | Barcode_1\_NTC | UNKNOWN | FAM      | NFQ-MGB  | 36.778247833251953 | 36.35009 | 0.6055012 | NA       | NA            | NA          | NA          | NA               | NA    | NA         | FALSE                  |          0.2 | TRUE               |              3 |           31 | Inconclusive | NA       | 0.9147403 | RGB(0,139,69)  | N      | N       | Y      | N     | N     | data//Plate 1.xls | NA     |
+|   25 | C1            | FALSE | A0.1        | Barcode_1      | UNKNOWN | FAM      | NFQ-MGB  | 20.320652008056641 | 20.23325 | 0.0774648 | NA       | NA            | NA          | NA          | NA               | NA    | NA         | FALSE                  |          0.2 | TRUE               |              3 |           16 | Amp          | NA       | 0.9699352 | RGB(176,23,31) | N      | N       | N      | N     | N     | data//Plate 1.xls | NA     |
+|   26 | C2            | FALSE | A0.2        | Barcode_1      | UNKNOWN | FAM      | NFQ-MGB  | 19.764341354370117 | 19.85664 | 0.0884714 | NA       | NA            | NA          | NA          | NA               | NA    | NA         | FALSE                  |          0.2 | TRUE               |              3 |           14 | Amp          | NA       | 0.9626578 | RGB(176,23,31) | N      | N       | N      | N     | N     | data//Plate 1.xls | NA     |
+|   27 | C3            | FALSE | A0.3        | Barcode_1      | UNKNOWN | FAM      | NFQ-MGB  | 18.813695907592773 | 19.04667 | 0.3385253 | NA       | NA            | NA          | NA          | NA               | NA    | NA         | FALSE                  |          0.2 | TRUE               |              3 |           13 | Amp          | NA       | 0.9706940 | RGB(176,23,31) | N      | N       | N      | N     | N     | data//Plate 1.xls | NA     |
+|   28 | C4            | FALSE | A1.1        | Barcode_1      | UNKNOWN | FAM      | NFQ-MGB  | 18.816024780273438 | 18.87321 | 0.0788805 | NA       | NA            | NA          | NA          | NA               | NA    | NA         | FALSE                  |          0.2 | TRUE               |              3 |           13 | Amp          | NA       | 0.9645014 | RGB(176,23,31) | N      | N       | N      | N     | N     | data//Plate 1.xls | NA     |
 
 ## Tidy the data
 
@@ -120,23 +113,21 @@ data_extracted <- data_raw |>
     ## Warning in mask$eval_all_mutate(quo): NAs introduced by coercion
 
 ``` r
-show(data_extracted)
+kable(head(data_extracted, n = 10))
 ```
 
-    ## # A tibble: 198 × 6
-    ##       ct sample_name well_position ct_threshold auto_ct_threshold target_name  
-    ##    <dbl> <chr>       <chr>                <dbl> <lgl>             <fct>        
-    ##  1  NA   Blank       A1                     0.2 FALSE             Blank        
-    ##  2  NA   Blank       A2                     0.2 FALSE             Blank        
-    ##  3  NA   Blank       A3                     0.2 FALSE             Blank        
-    ##  4  35.9 B1_NTC      B1                     0.2 FALSE             Barcode_1_NTC
-    ##  5  NA   B1_NTC      B2                     0.2 FALSE             Barcode_1_NTC
-    ##  6  36.8 B1_NTC      B3                     0.2 FALSE             Barcode_1_NTC
-    ##  7  20.3 A0.1        C1                     0.2 FALSE             Barcode_1    
-    ##  8  19.8 A0.2        C2                     0.2 FALSE             Barcode_1    
-    ##  9  18.8 A0.3        C3                     0.2 FALSE             Barcode_1    
-    ## 10  18.8 A1.1        C4                     0.2 FALSE             Barcode_1    
-    ## # … with 188 more rows
+|       ct | sample_name | well_position | ct_threshold | auto_ct_threshold | target_name    |
+|---------:|:------------|:--------------|-------------:|:------------------|:---------------|
+|       NA | Blank       | A1            |          0.2 | FALSE             | Blank          |
+|       NA | Blank       | A2            |          0.2 | FALSE             | Blank          |
+|       NA | Blank       | A3            |          0.2 | FALSE             | Blank          |
+| 35.92194 | B1_NTC      | B1            |          0.2 | FALSE             | Barcode_1\_NTC |
+|       NA | B1_NTC      | B2            |          0.2 | FALSE             | Barcode_1\_NTC |
+| 36.77825 | B1_NTC      | B3            |          0.2 | FALSE             | Barcode_1\_NTC |
+| 20.32065 | A0.1        | C1            |          0.2 | FALSE             | Barcode_1      |
+| 19.76434 | A0.2        | C2            |          0.2 | FALSE             | Barcode_1      |
+| 18.81370 | A0.3        | C3            |          0.2 | FALSE             | Barcode_1      |
+| 18.81602 | A1.1        | C4            |          0.2 | FALSE             | Barcode_1      |
 
 TODO: It would be nice to specify what values to convert to `NA`
 quietly.
@@ -199,19 +190,21 @@ data_tidy <- data_extracted |>
     timepoint = as.integer(timepoint),
     tech_rep = as.factor(tech_rep)
   )
-glimpse(data_tidy)
+kable(head(data_tidy, n = 10))
 ```
 
-    ## Rows: 198
-    ## Columns: 8
-    ## $ ct                <dbl> NA, NA, NA, 35.92194, NA, 36.77825, 20.32065, 19.764…
-    ## $ treatment_group   <fct> Blank, Blank, Blank, NTC, NTC, NTC, A, A, A, A, A, A…
-    ## $ timepoint         <int> NA, NA, NA, NA, NA, NA, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3…
-    ## $ tech_rep          <fct> NA, NA, NA, NA, NA, NA, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1…
-    ## $ well_position     <chr> "A1", "A2", "A3", "B1", "B2", "B3", "C1", "C2", "C3"…
-    ## $ ct_threshold      <dbl> 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.…
-    ## $ auto_ct_threshold <lgl> FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FAL…
-    ## $ target_name       <fct> Blank, Blank, Blank, Barcode_1_NTC, Barcode_1_NTC, B…
+|       ct | treatment_group | timepoint | tech_rep | well_position | ct_threshold | auto_ct_threshold | target_name    |
+|---------:|:----------------|----------:|:---------|:--------------|-------------:|:------------------|:---------------|
+|       NA | Blank           |        NA | NA       | A1            |          0.2 | FALSE             | Blank          |
+|       NA | Blank           |        NA | NA       | A2            |          0.2 | FALSE             | Blank          |
+|       NA | Blank           |        NA | NA       | A3            |          0.2 | FALSE             | Blank          |
+| 35.92194 | NTC             |        NA | NA       | B1            |          0.2 | FALSE             | Barcode_1\_NTC |
+|       NA | NTC             |        NA | NA       | B2            |          0.2 | FALSE             | Barcode_1\_NTC |
+| 36.77825 | NTC             |        NA | NA       | B3            |          0.2 | FALSE             | Barcode_1\_NTC |
+| 20.32065 | A               |         0 | 1        | C1            |          0.2 | FALSE             | Barcode_1      |
+| 19.76434 | A               |         0 | 2        | C2            |          0.2 | FALSE             | Barcode_1      |
+| 18.81370 | A               |         0 | 3        | C3            |          0.2 | FALSE             | Barcode_1      |
+| 18.81602 | A               |         1 | 1        | C4            |          0.2 | FALSE             | Barcode_1      |
 
 Let’s make sure we have 9 blanks and NTCs (3 per plate) and 36 of the
 other treatments (3 pcr replicates \* 3 technical replicates \* 4
@@ -220,52 +213,49 @@ timepoints).
 ``` r
 data_tidy |>
   group_by(treatment_group) |>
-  count()
+  count() |> 
+  kable()
 ```
 
-    ## # A tibble: 7 × 2
-    ## # Groups:   treatment_group [7]
-    ##   treatment_group     n
-    ##   <fct>           <int>
-    ## 1 A                  36
-    ## 2 B                  36
-    ## 3 Blank               9
-    ## 4 C                  36
-    ## 5 D                  36
-    ## 6 E                  36
-    ## 7 NTC                 9
+| treatment_group |   n |
+|:----------------|----:|
+| A               |  36 |
+| B               |  36 |
+| Blank           |   9 |
+| C               |  36 |
+| D               |  36 |
+| E               |  36 |
+| NTC             |   9 |
 
 First, let’s take a look at the Blanks and NTCs. These should mostly
 have `NA` for their ct value.
 
 ``` r
 data_tidy |> 
-  filter(treatment_group == "Blank" | treatment_group == "NTC")
+  filter(treatment_group == "Blank" | treatment_group == "NTC") |> 
+  kable()
 ```
 
-    ## # A tibble: 18 × 8
-    ##       ct treatment_group timepoint tech_rep well_posit…¹ ct_th…² auto_…³ targe…⁴
-    ##    <dbl> <fct>               <int> <fct>    <chr>          <dbl> <lgl>   <fct>  
-    ##  1 NA    Blank                  NA <NA>     A1               0.2 FALSE   Blank  
-    ##  2 NA    Blank                  NA <NA>     A2               0.2 FALSE   Blank  
-    ##  3 NA    Blank                  NA <NA>     A3               0.2 FALSE   Blank  
-    ##  4 35.9  NTC                    NA <NA>     B1               0.2 FALSE   Barcod…
-    ##  5 NA    NTC                    NA <NA>     B2               0.2 FALSE   Barcod…
-    ##  6 36.8  NTC                    NA <NA>     B3               0.2 FALSE   Barcod…
-    ##  7 33.5  Blank                  NA <NA>     A1               0.2 FALSE   Blank  
-    ##  8 NA    Blank                  NA <NA>     A2               0.2 FALSE   Blank  
-    ##  9  6.36 Blank                  NA <NA>     A3               0.2 FALSE   Blank  
-    ## 10 NA    NTC                    NA <NA>     B1               0.2 FALSE   Barcod…
-    ## 11 NA    NTC                    NA <NA>     B2               0.2 FALSE   Barcod…
-    ## 12 NA    NTC                    NA <NA>     B3               0.2 FALSE   Barcod…
-    ## 13 NA    Blank                  NA <NA>     A1               0.2 FALSE   Blank  
-    ## 14 NA    Blank                  NA <NA>     A2               0.2 FALSE   Blank  
-    ## 15 NA    Blank                  NA <NA>     A3               0.2 FALSE   Blank  
-    ## 16 39.7  NTC                    NA <NA>     B1               0.2 FALSE   Barcod…
-    ## 17 NA    NTC                    NA <NA>     B2               0.2 FALSE   Barcod…
-    ## 18 37.3  NTC                    NA <NA>     B3               0.2 FALSE   Barcod…
-    ## # … with abbreviated variable names ¹​well_position, ²​ct_threshold,
-    ## #   ³​auto_ct_threshold, ⁴​target_name
+|        ct | treatment_group | timepoint | tech_rep | well_position | ct_threshold | auto_ct_threshold | target_name    |
+|----------:|:----------------|----------:|:---------|:--------------|-------------:|:------------------|:---------------|
+|        NA | Blank           |        NA | NA       | A1            |          0.2 | FALSE             | Blank          |
+|        NA | Blank           |        NA | NA       | A2            |          0.2 | FALSE             | Blank          |
+|        NA | Blank           |        NA | NA       | A3            |          0.2 | FALSE             | Blank          |
+| 35.921940 | NTC             |        NA | NA       | B1            |          0.2 | FALSE             | Barcode_1\_NTC |
+|        NA | NTC             |        NA | NA       | B2            |          0.2 | FALSE             | Barcode_1\_NTC |
+| 36.778248 | NTC             |        NA | NA       | B3            |          0.2 | FALSE             | Barcode_1\_NTC |
+| 33.499622 | Blank           |        NA | NA       | A1            |          0.2 | FALSE             | Blank          |
+|        NA | Blank           |        NA | NA       | A2            |          0.2 | FALSE             | Blank          |
+|  6.357395 | Blank           |        NA | NA       | A3            |          0.2 | FALSE             | Blank          |
+|        NA | NTC             |        NA | NA       | B1            |          0.2 | FALSE             | Barcode_1\_NTC |
+|        NA | NTC             |        NA | NA       | B2            |          0.2 | FALSE             | Barcode_1\_NTC |
+|        NA | NTC             |        NA | NA       | B3            |          0.2 | FALSE             | Barcode_1\_NTC |
+|        NA | Blank           |        NA | NA       | A1            |          0.2 | FALSE             | Blank          |
+|        NA | Blank           |        NA | NA       | A2            |          0.2 | FALSE             | Blank          |
+|        NA | Blank           |        NA | NA       | A3            |          0.2 | FALSE             | Blank          |
+| 39.660065 | NTC             |        NA | NA       | B1            |          0.2 | FALSE             | Barcode_1\_NTC |
+|        NA | NTC             |        NA | NA       | B2            |          0.2 | FALSE             | Barcode_1\_NTC |
+| 37.288032 | NTC             |        NA | NA       | B3            |          0.2 | FALSE             | Barcode_1\_NTC |
 
 We can make a boxplot to compare the distribution of ct across
 treatments. To disply the NAs, we’ll set them to one more than the
@@ -326,21 +316,21 @@ data_concentration <- data_tidy |>
     dilution = (ct - std_curve_intercept) / std_curve_slope,
     log_concentration = log(concentration_at_d0) + log(dilution_factor) * dilution,
   )
-glimpse(data_concentration)
+kable(head(data_concentration, n = 10))
 ```
 
-    ## Rows: 144
-    ## Columns: 10
-    ## $ ct                <dbl> 20.32065, 19.76434, 18.81370, 18.81602, 19.44741, 19…
-    ## $ treatment_group   <fct> A, A, A, A, A, A, A, A, A, A, A, A, A, A, A, A, A, A…
-    ## $ timepoint         <int> 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 0, 0, 0, 1, 1, 1…
-    ## $ tech_rep          <fct> 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3…
-    ## $ well_position     <chr> "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9"…
-    ## $ ct_threshold      <dbl> 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.…
-    ## $ auto_ct_threshold <lgl> FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FAL…
-    ## $ target_name       <fct> Barcode_1, Barcode_1, Barcode_1, Barcode_1, Barcode_…
-    ## $ dilution          <dbl> 6.288793, 6.439739, 6.697681, 6.697049, 6.525733, 6.…
-    ## $ log_concentration <dbl> 14.46750, 14.81506, 15.40900, 15.40754, 15.01307, 14…
+|       ct | treatment_group | timepoint | tech_rep | well_position | ct_threshold | auto_ct_threshold | target_name | dilution | log_concentration |
+|---------:|:----------------|----------:|:---------|:--------------|-------------:|:------------------|:------------|---------:|------------------:|
+| 20.32065 | A               |         0 | 1        | C1            |          0.2 | FALSE             | Barcode_1   | 6.288793 |          14.46750 |
+| 19.76434 | A               |         0 | 2        | C2            |          0.2 | FALSE             | Barcode_1   | 6.439739 |          14.81506 |
+| 18.81370 | A               |         0 | 3        | C3            |          0.2 | FALSE             | Barcode_1   | 6.697681 |          15.40900 |
+| 18.81602 | A               |         1 | 1        | C4            |          0.2 | FALSE             | Barcode_1   | 6.697049 |          15.40754 |
+| 19.44741 | A               |         1 | 2        | C5            |          0.2 | FALSE             | Barcode_1   | 6.525733 |          15.01307 |
+| 19.54228 | A               |         1 | 3        | C6            |          0.2 | FALSE             | Barcode_1   | 6.499993 |          14.95380 |
+| 18.98299 | A               |         2 | 1        | C7            |          0.2 | FALSE             | Barcode_1   | 6.651747 |          15.30323 |
+| 18.98078 | A               |         2 | 2        | C8            |          0.2 | FALSE             | Barcode_1   | 6.652345 |          15.30461 |
+| 19.66541 | A               |         2 | 3        | C9            |          0.2 | FALSE             | Barcode_1   | 6.466582 |          14.87687 |
+| 20.02242 | A               |         3 | 1        | C10           |          0.2 | FALSE             | Barcode_1   | 6.369714 |          14.65382 |
 
 Since we have three PCR replicates per technical replicate, we can
 summarize our data with min, median, and max without any loss of
@@ -352,28 +342,62 @@ data_concentration |>
   summarize(
     conc_min = min(log_concentration, na.rm = TRUE),
     conc_med = median(log_concentration, na.rm = TRUE),
-    conc_max = max(log_concentration, na.rm = TRUE)
-  )
+    conc_max = max(log_concentration, na.rm = TRUE),
+    .groups="drop"
+  ) |> 
+  kable()
 ```
 
-    ## `summarise()` has grouped output by 'treatment_group', 'timepoint'. You can
-    ## override using the `.groups` argument.
-
-    ## # A tibble: 48 × 6
-    ## # Groups:   treatment_group, timepoint [16]
-    ##    treatment_group timepoint tech_rep conc_min conc_med conc_max
-    ##    <fct>               <int> <fct>       <dbl>    <dbl>    <dbl>
-    ##  1 A                       0 1            14.5     14.5     14.6
-    ##  2 A                       0 2            14.7     14.8     14.8
-    ##  3 A                       0 3            15.0     15.4     15.4
-    ##  4 A                       1 1            15.3     15.4     15.4
-    ##  5 A                       1 2            15.0     15.1     15.2
-    ##  6 A                       1 3            15.0     15.0     15.1
-    ##  7 A                       2 1            15.2     15.2     15.3
-    ##  8 A                       2 2            15.2     15.3     15.3
-    ##  9 A                       2 3            14.9     14.9     14.9
-    ## 10 A                       3 1            14.6     14.7     14.7
-    ## # … with 38 more rows
+| treatment_group | timepoint | tech_rep |  conc_min |  conc_med |  conc_max |
+|:----------------|----------:|:---------|----------:|----------:|----------:|
+| A               |         0 | 1        | 14.467498 | 14.539121 | 14.559697 |
+| A               |         0 | 2        | 14.704875 | 14.752250 | 14.815063 |
+| A               |         0 | 3        | 15.020836 | 15.360500 | 15.408997 |
+| A               |         1 | 1        | 15.315593 | 15.392311 | 15.407542 |
+| A               |         1 | 2        | 15.013071 | 15.123416 | 15.193376 |
+| A               |         1 | 3        | 14.953803 | 14.979106 | 15.100242 |
+| A               |         2 | 1        | 15.222434 | 15.233419 | 15.303230 |
+| A               |         2 | 2        | 15.183994 | 15.304607 | 15.330360 |
+| A               |         2 | 3        | 14.873419 | 14.876872 | 14.948056 |
+| A               |         3 | 1        | 14.631852 | 14.651272 | 14.653825 |
+| A               |         3 | 2        | 14.742572 | 14.751832 | 14.800324 |
+| A               |         3 | 3        | 15.042985 | 15.098861 | 15.100316 |
+| B               |         0 | 1        | 14.691215 | 14.707181 | 14.723714 |
+| B               |         0 | 2        | 14.937496 | 14.981082 | 14.986873 |
+| B               |         0 | 3        | 14.630075 | 14.772313 | 14.884848 |
+| B               |         1 | 1        | 14.460672 | 14.507884 | 14.530743 |
+| B               |         1 | 2        | 14.431200 | 14.524827 | 14.569874 |
+| B               |         1 | 3        | 14.375207 | 14.747474 | 14.834689 |
+| B               |         2 | 1        | 14.445850 | 14.506649 | 14.514520 |
+| B               |         2 | 2        | 14.399098 | 14.540501 | 14.597506 |
+| B               |         2 | 3        | 14.829546 | 14.885799 | 14.944224 |
+| B               |         3 | 1        | 13.393890 | 13.420946 | 13.479134 |
+| B               |         3 | 2        | 13.508365 | 13.536396 | 13.662985 |
+| B               |         3 | 3        | 12.045272 | 12.175395 | 12.181063 |
+| C               |         0 | 1        | 15.585203 | 15.730980 | 15.774331 |
+| C               |         0 | 2        | 15.640385 | 15.744967 | 15.827471 |
+| C               |         0 | 3        | 15.392854 | 15.860508 | 15.891046 |
+| C               |         1 | 1        | 15.766611 | 15.774405 | 15.815867 |
+| C               |         1 | 2        | 15.799626 | 15.835428 | 15.892060 |
+| C               |         1 | 3        | 15.766942 | 15.780796 | 15.817647 |
+| C               |         2 | 1        | 15.630437 | 15.666167 | 15.683122 |
+| C               |         2 | 2        | 15.748995 | 15.762468 | 15.825183 |
+| C               |         2 | 3        | 15.745316 | 15.745680 | 15.763973 |
+| C               |         3 | 1        | 15.471512 | 15.509831 | 15.526576 |
+| C               |         3 | 2        | 15.490110 | 15.504371 | 15.567375 |
+| C               |         3 | 3        | 15.388014 | 15.439595 | 15.448920 |
+| D               |         0 | 1        | 11.023879 | 11.052359 | 11.103619 |
+| D               |         0 | 2        | 10.819916 | 10.849192 | 11.061266 |
+| D               |         0 | 3        | 10.687431 | 11.142662 | 11.213070 |
+| D               |         1 | 1        |  7.185397 |  7.231021 |  7.245195 |
+| D               |         1 | 2        |  7.247885 |  7.276237 |  7.328588 |
+| D               |         1 | 3        |  7.880027 |  8.045826 |  8.107687 |
+| D               |         2 | 1        |  7.131532 |  7.219262 |  7.287010 |
+| D               |         2 | 2        |  7.770489 |  7.813055 |  7.832202 |
+| D               |         2 | 3        |  7.650187 |  7.672781 |  7.842286 |
+| D               |         3 | 1        |  7.398282 |  7.554920 |  7.801422 |
+| D               |         3 | 2        |  6.148432 |  6.912249 |  7.093166 |
+| D               |         3 | 3        |  7.767307 |  7.889023 |  7.912897 |
 
 # Plot log concentrations vs time for each condition
 
@@ -490,20 +514,19 @@ models <- treatments_to_keep |>
     ~ mutate(.x, treatment_group=.y, collapsed=FALSE, .before=1)
     ) |> 
   list_rbind()
-models
+kable(models)
 ```
 
-    ## # A tibble: 8 × 7
-    ##   treatment_group collapsed term        estimate std.error statistic  p.value
-    ##   <chr>           <lgl>     <chr>          <dbl>     <dbl>     <dbl>    <dbl>
-    ## 1 A               FALSE     (Intercept) 15.0        0.0784   192.    3.68e-53
-    ## 2 A               FALSE     timepoint   -0.00741    0.0419    -0.177 8.61e- 1
-    ## 3 B               FALSE     (Intercept) 15.0        0.153     98.5   2.29e-43
-    ## 4 B               FALSE     timepoint   -0.523      0.0816    -6.41  2.56e- 7
-    ## 5 C               FALSE     (Intercept) 15.8        0.0343   461.    4.08e-66
-    ## 6 C               FALSE     timepoint   -0.0776     0.0183    -4.23  1.66e- 4
-    ## 7 D               FALSE     (Intercept)  9.98       0.286     34.8   3.44e-28
-    ## 8 D               FALSE     timepoint   -1.08       0.153     -7.02  4.18e- 8
+| treatment_group | collapsed | term        |   estimate | std.error |   statistic |   p.value |
+|:----------------|:----------|:------------|-----------:|----------:|------------:|----------:|
+| A               | FALSE     | (Intercept) | 15.0071602 | 0.0783592 | 191.5175973 | 0.0000000 |
+| A               | FALSE     | timepoint   | -0.0074119 | 0.0418847 |  -0.1769585 | 0.8605909 |
+| B               | FALSE     | (Intercept) | 15.0443407 | 0.1526598 |  98.5481520 | 0.0000000 |
+| B               | FALSE     | timepoint   | -0.5228103 | 0.0816001 |  -6.4069822 | 0.0000003 |
+| C               | FALSE     | (Intercept) | 15.8001163 | 0.0342951 | 460.7106971 | 0.0000000 |
+| C               | FALSE     | timepoint   | -0.0775818 | 0.0183315 |  -4.2321566 | 0.0001657 |
+| D               | FALSE     | (Intercept) |  9.9792068 | 0.2863794 |  34.8461059 | 0.0000000 |
+| D               | FALSE     | timepoint   | -1.0750682 | 0.1530762 |  -7.0230909 | 0.0000000 |
 
 ## Collapsing qPCR replicates
 
@@ -548,20 +571,19 @@ models_collapsed <- treatments_to_keep |>
     ~ mutate(.x, treatment_group=.y, collapsed=TRUE, .before=1)
     ) |> 
   list_rbind() 
-models_collapsed
+kable(models_collapsed)
 ```
 
-    ## # A tibble: 8 × 7
-    ##   treatment_group collapsed term        estimate std.error statistic   p.value
-    ##   <chr>           <lgl>     <chr>          <dbl>     <dbl>     <dbl>     <dbl>
-    ## 1 A               TRUE      (Intercept) 15.0        0.186    80.7    0.000153 
-    ## 2 A               TRUE      timepoint   -0.00741    0.0994   -0.0746 0.947    
-    ## 3 B               TRUE      (Intercept) 15.0        0.473    31.8    0.000985 
-    ## 4 B               TRUE      timepoint   -0.523      0.253    -2.07   0.174    
-    ## 5 C               TRUE      (Intercept) 15.8        0.0995  159.     0.0000396
-    ## 6 C               TRUE      timepoint   -0.0776     0.0532   -1.46   0.282    
-    ## 7 D               TRUE      (Intercept)  9.98       1.10      9.08   0.0119   
-    ## 8 D               TRUE      timepoint   -1.08       0.587    -1.83   0.209
+| treatment_group | collapsed | term        |   estimate | std.error |   statistic |   p.value |
+|:----------------|:----------|:------------|-----------:|----------:|------------:|----------:|
+| A               | TRUE      | (Intercept) | 15.0071602 | 0.1858890 |  80.7318212 | 0.0001534 |
+| A               | TRUE      | timepoint   | -0.0074119 | 0.0993619 |  -0.0745946 | 0.9473269 |
+| B               | TRUE      | (Intercept) | 15.0443407 | 0.4725921 |  31.8336698 | 0.0009853 |
+| B               | TRUE      | timepoint   | -0.5228103 | 0.2526111 |  -2.0696254 | 0.1743497 |
+| C               | TRUE      | (Intercept) | 15.8001163 | 0.0994830 | 158.8222377 | 0.0000396 |
+| C               | TRUE      | timepoint   | -0.0775818 | 0.0531759 |  -1.4589646 | 0.2819668 |
+| D               | TRUE      | (Intercept) |  9.9792068 | 1.0988973 |   9.0811095 | 0.0119099 |
+| D               | TRUE      | timepoint   | -1.0750682 | 0.5873853 |  -1.8302607 | 0.2086985 |
 
 Collapsing the qPCR replicates increases the standard error of the
 regression coefficients:

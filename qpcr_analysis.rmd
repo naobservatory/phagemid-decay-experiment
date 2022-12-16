@@ -7,6 +7,7 @@ output: github_document
 library(tidyverse)
 library(readxl)
 library(broom)
+library(knitr)
 ```
 
 # Ingest data
@@ -41,7 +42,7 @@ data_raw <- list.files(
   ) |>
   map(read_qpcr_excel) |> 
   list_rbind()
-show(data_raw)
+kable(head(data_raw, n = 10))
 ```
 
 ## Tidy the data
@@ -70,7 +71,7 @@ data_extracted <- data_raw |>
     auto_ct_threshold = `Automatic Ct Threshold`,
     target_name = as.factor(`Target Name`)
   )
-show(data_extracted)
+kable(head(data_extracted, n = 10))
 ```
 
 TODO: It would be nice to specify what values to convert to `NA` quietly.
@@ -124,20 +125,22 @@ data_tidy <- data_extracted |>
     timepoint = as.integer(timepoint),
     tech_rep = as.factor(tech_rep)
   )
-glimpse(data_tidy)
+kable(head(data_tidy, n = 10))
 ```
 
 Let's make sure we have 9 blanks and NTCs (3 per plate) and 36 of the other treatments (3 pcr replicates * 3 technical replicates * 4 timepoints).
 ```{r}
 data_tidy |>
   group_by(treatment_group) |>
-  count()
+  count() |> 
+  kable()
 ```
 
 First, let's take a look at the Blanks and NTCs. These should mostly have `NA` for their ct value.
 ```{r}
 data_tidy |> 
-  filter(treatment_group == "Blank" | treatment_group == "NTC")
+  filter(treatment_group == "Blank" | treatment_group == "NTC") |> 
+  kable()
 ```
 
 We can make a boxplot to compare the distribution of ct across treatments.
@@ -188,7 +191,7 @@ data_concentration <- data_tidy |>
     dilution = (ct - std_curve_intercept) / std_curve_slope,
     log_concentration = log(concentration_at_d0) + log(dilution_factor) * dilution,
   )
-glimpse(data_concentration)
+kable(head(data_concentration, n = 10))
 ```
 
 Since we have three PCR replicates per technical replicate, we can summarize our data with min, median, and max without any loss of information.
@@ -199,8 +202,10 @@ data_concentration |>
   summarize(
     conc_min = min(log_concentration, na.rm = TRUE),
     conc_med = median(log_concentration, na.rm = TRUE),
-    conc_max = max(log_concentration, na.rm = TRUE)
-  )
+    conc_max = max(log_concentration, na.rm = TRUE),
+    .groups="drop"
+  ) |> 
+  kable()
 ```
 
 # Plot log concentrations vs time for each condition
@@ -295,7 +300,7 @@ models <- treatments_to_keep |>
     ~ mutate(.x, treatment_group=.y, collapsed=FALSE, .before=1)
     ) |> 
   list_rbind()
-models
+kable(models)
 ```
 
 ## Collapsing qPCR replicates
@@ -332,7 +337,7 @@ models_collapsed <- treatments_to_keep |>
     ~ mutate(.x, treatment_group=.y, collapsed=TRUE, .before=1)
     ) |> 
   list_rbind() 
-models_collapsed
+kable(models_collapsed)
 ```
 
 Collapsing the qPCR replicates increases the standard error of the regression coefficients:
