@@ -40,7 +40,7 @@ data_raw <- list.files(
   pattern = filename_pattern,
   full.names = TRUE
   ) |>
-  map(read_qpcr_excel) |> 
+  map(read_qpcr_excel) |>
   list_rbind()
 kable(head(data_raw, n = 10))
 ```
@@ -80,7 +80,7 @@ For quality control, let's check assertions our assertions about about `ct_thres
 
 ```{r}
 expected_ct_threshold <- 0.2
-data_extracted |> 
+data_extracted |>
   summarize(
     all_auto_ct_theshold_false = all(!auto_ct_threshold),
     all_ct_theshold_expected = all(ct_threshold == expected_ct_threshold)
@@ -123,15 +123,15 @@ sample_name_pattern = c(
   "$"
 )
 
-data_tidy <- data_extracted |> 
+data_tidy <- data_extracted |>
   mutate(
     sample_name = str_replace(sample_name, "B1_NTC", "NTC")
-  ) |> 
+  ) |>
   separate_wider_regex(
     sample_name,
     patterns = sample_name_pattern,
     too_few = "align_start"
-  ) |> 
+  ) |>
   mutate(
     treatment_group = recode(treatment_group, !!!coding),
     control = treatment_group %in% controls,
@@ -145,14 +145,14 @@ Let's make sure we have 9 blanks and NTCs (3 per plate) and 36 of the other trea
 ```{r}
 data_tidy |>
   group_by(treatment_group) |>
-  count() |> 
+  count() |>
   kable()
 ```
 
 First, let's take a look at the Blanks and NTCs. These should mostly have `NA` for their ct value.
 ```{r}
-data_tidy |> 
-  filter(treatment_group == "Blank" | treatment_group == "NTC") |> 
+data_tidy |>
+  filter(treatment_group == "Blank" | treatment_group == "NTC") |>
   kable()
 ```
 
@@ -216,7 +216,7 @@ data_concentration |>
     conc_med = median(log10_concentration, na.rm = TRUE),
     conc_max = max(log10_concentration, na.rm = TRUE),
     .groups="drop"
-  ) |> 
+  ) |>
   kable()
 ```
 
@@ -225,7 +225,7 @@ data_concentration |>
 First, we plot all the treatment groups on the same timecourse to see differences in absolute as well as relative concentration.
 
 ```{r}
-data_concentration |> 
+data_concentration |>
   ggplot(
     aes(timepoint, log10_concentration, shape = treatment_group, color = treatment_group)
     ) +
@@ -304,19 +304,19 @@ data_concentration |>
 ```{r}
 # TODO: Make this function more generic
 fit_lm_by_treatment <- function(data){
-  treatments <- unique(data$treatment_group) 
-  treatments |> 
+  treatments <- unique(data$treatment_group)
+  treatments |>
     map(~ filter(data, treatment_group == .)) |>
     map(~ lm(log10_concentration ~ timepoint, .)) |>
     map(tidy) |>
     map2(
       treatments,
       ~ mutate(.x, treatment_group=.y, .before=1)
-      ) |> 
+      ) |>
     list_rbind()
 }
 
-models <- fit_lm_by_treatment(data_concentration) |> 
+models <- fit_lm_by_treatment(data_concentration) |>
     mutate(collapsed=FALSE, .before=1)
 kable(models)
 ```
@@ -325,7 +325,7 @@ kable(models)
 
 Now, we create a new table that collapses the qPCR replicates:
 ```{r}
-data_collapsed <- data_concentration |> 
+data_collapsed <- data_concentration |>
   group_by(treatment_group, timepoint, tech_rep) |>
   summarise(log10_concentration = mean(log10_concentration), .groups="drop")
 ```
@@ -352,7 +352,7 @@ data_collapsed |>
 We can fit linear models separately for each timepoint and examine the coefficients and standard errors:
 
 ```{r}
-models_collapsed <- fit_lm_by_treatment(data_collapsed) |> 
+models_collapsed <- fit_lm_by_treatment(data_collapsed) |>
     mutate(collapsed=TRUE, .before=1)
 models_all <- rbind(models, models_collapsed)
 kable(models_all)
@@ -360,11 +360,74 @@ kable(models_all)
 
 Collapsing the qPCR replicates increases the standard error of the regression coefficients:
 ```{r}
-models_all |> 
-  filter(term == "timepoint") |> 
+models_all |>
+  filter(term == "timepoint") |>
   ggplot(aes(collapsed, std.error, group=treatment_group)) +
   geom_line(aes(linetype = treatment_group)) +
   geom_point()
 ```
 
-## Hierarchical model [TODO]
+# Redoing the standard curve
+
+Read the excel file produced by the qPCR machine.
+We want barcode 18-04, which is "B2" in the file.
+
+We also will convert dilution to log10 concentration.
+In this coding, dilution $d$ is 10x more concentrated than dilution $d-1$.
+We previously saved the expected concentration at $d=0$.
+In the future, we should probably include uncertainty in this value.
+
+```{r}
+sample_name_pattern_standard_curve <- c(
+  "^",
+  group = "[A-Za-z0-9]+",
+  "_D",
+  dilution = "[0-9]+",
+  "$"
+)
+
+standard_curve_file <- paste(data_dir, "T1_QS2_018_BC49 and T1_QS2_018_BC04.xls", sep="")
+
+data_standard_curve <- read_qpcr_excel(standard_curve_file) |>
+  # TODO: package this into a function
+  transmute(
+    ct = as.numeric(CT),
+    sample_name = `Sample Name`,
+    well_position = `Well Position`,
+    ct_threshold = `Ct Threshold`,
+    auto_ct_threshold = `Automatic Ct Threshold`,
+    target_name = as.factor(`Target Name`)
+  ) |>
+  separate_wider_regex(
+    sample_name,
+    patterns = sample_name_pattern_standard_curve,
+    too_few = "align_start"
+  ) |>
+  mutate(dilution = as.integer(dilution)) |>
+  filter(group == "B2") |>
+  drop_na(dilution) |>
+  mutate(log10_concentration = log10(concentration_at_d0) + dilution)
+
+kable(head(data_standard_curve, n = 10))
+
+```
+
+```{r}
+data_standard_curve |>
+  ggplot(mapping = aes(log10_concentration, ct)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+```
+The common deviations from linearity at each dilution suggests pipetting error in the dilution series in addition to qPCR variation.
+
+Fit linear model.
+```{r}
+standard_curve <- lm(ct ~ dilution, data_standard_curve)
+summary(standard_curve)
+```
+
+These are the same coefficients that Ari found in Excel.
+
+A correct model would take into account that errors in dilution propagate to all future dilutions.
+
+# Hierarchical model with error propagation [TODO]
