@@ -259,362 +259,30 @@ data_tidy |>
 
 # Convert raw Ct values to concentrations
 
-From Ari's Excel sheet, we have the following steps:
-
-1. Use the regression coefficients from the standard to convert Ct values to "dilution" (this is a linear relationship $c_t = a d + b$)
-2. Convert dilution to concentration (in copies per microliter) using $\text{concentration} = C e^{\log(f_d) d}$, where $f_d$ is the fold-dilution at each dilution. In this case, $f_d = 10$.
-
-The variable $d$ labels the level of dilution where 9 is a 10x dilution of the original sample, 8 is 10x of dilution 9, etc.
-By implication, the coefficient $C$ is the expected concentration at dilution 0, i.e. the original concentration times $10^{10}$.
-
-Note that the coefficients $a$, $b$, and $C$, are phagemid-specific.
-The first two are estimated from the standard curve.
-$C$ is known from the experimental protocol.
-In the future we would like estimate these concentrations directly in this workflow.
-
-We need to specify these coefficients:
-
-```r
-std_curve_slope <- -3.6855
-std_curve_intercept <- 43.498
-concentration_at_d0 <- 0.9871
-dilution_factor <- 10
-```
-
-We'll apply the two equations in separate steps so we can compare intermediate values with Ari's spreadsheet. Eventually, we'll condense this into one conversion.
-
-We're also going to filter out the negative controls from now on.
-
-
-```r
-data_concentration <- data_tidy |>
-  filter(!control) |>
-  mutate(
-    dilution = (ct - std_curve_intercept) / std_curve_slope,
-    log10_concentration = log10(concentration_at_d0) + log10(dilution_factor) * dilution,
-  )
-kable(head(data_concentration, n = 10))
-```
-
-
-
-|source_file       |       ct|treatment_group | timepoint|tech_rep |well_position | ct_threshold|auto_ct_threshold |target_name |control | dilution| log10_concentration|
-|:-----------------|--------:|:---------------|---------:|:--------|:-------------|------------:|:-----------------|:-----------|:-------|--------:|-------------------:|
-|data//Plate 1.xls | 20.32065|WW + phagemid   |         0|1        |C1            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.288793|            6.283155|
-|data//Plate 1.xls | 19.76434|WW + phagemid   |         0|2        |C2            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.439739|            6.434100|
-|data//Plate 1.xls | 18.81370|WW + phagemid   |         0|3        |C3            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.697681|            6.692042|
-|data//Plate 1.xls | 18.81602|WW + phagemid   |         1|1        |C4            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.697049|            6.691410|
-|data//Plate 1.xls | 19.44741|WW + phagemid   |         1|2        |C5            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.525733|            6.520094|
-|data//Plate 1.xls | 19.54228|WW + phagemid   |         1|3        |C6            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.499993|            6.494354|
-|data//Plate 1.xls | 18.98299|WW + phagemid   |         2|1        |C7            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.651747|            6.646108|
-|data//Plate 1.xls | 18.98078|WW + phagemid   |         2|2        |C8            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.652345|            6.646706|
-|data//Plate 1.xls | 19.66541|WW + phagemid   |         2|3        |C9            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.466582|            6.460943|
-|data//Plate 1.xls | 20.02242|WW + phagemid   |         3|1        |C10           |          0.2|FALSE             |Barcode_1   |FALSE   | 6.369714|            6.364075|
-
-Since we have three PCR replicates per technical replicate, we can summarize our data with min, median, and max without any loss of information.
-
-
-```r
-data_concentration |>
-  group_by(treatment_group, timepoint, tech_rep) |>
-  summarize(
-    conc_min = min(log10_concentration, na.rm = TRUE),
-    conc_med = median(log10_concentration, na.rm = TRUE),
-    conc_max = max(log10_concentration, na.rm = TRUE),
-    .groups="drop"
-  ) |>
-  kable()
-```
-
-
-
-|treatment_group           | timepoint|tech_rep | conc_min| conc_med| conc_max|
-|:-------------------------|---------:|:--------|--------:|--------:|--------:|
-|TBS + phagemid            |         0|1        | 6.768568| 6.831878| 6.850705|
-|TBS + phagemid            |         0|2        | 6.792533| 6.837952| 6.873783|
-|TBS + phagemid            |         0|3        | 6.685031| 6.888131| 6.901394|
-|TBS + phagemid            |         1|1        | 6.847352| 6.850737| 6.868744|
-|TBS + phagemid            |         1|2        | 6.861691| 6.877239| 6.901834|
-|TBS + phagemid            |         1|3        | 6.847496| 6.853513| 6.869517|
-|TBS + phagemid            |         2|1        | 6.788213| 6.803730| 6.811093|
-|TBS + phagemid            |         2|2        | 6.839702| 6.845553| 6.872789|
-|TBS + phagemid            |         2|3        | 6.838104| 6.838262| 6.846207|
-|TBS + phagemid            |         3|1        | 6.719192| 6.735834| 6.743106|
-|TBS + phagemid            |         3|2        | 6.727269| 6.733463| 6.760825|
-|TBS + phagemid            |         3|3        | 6.682930| 6.705331| 6.709381|
-|WW + phagemid             |         0|1        | 6.283155| 6.314260| 6.323196|
-|WW + phagemid             |         0|2        | 6.386246| 6.406821| 6.434100|
-|WW + phagemid             |         0|3        | 6.523466| 6.670980| 6.692042|
-|WW + phagemid             |         1|1        | 6.651478| 6.684796| 6.691410|
-|WW + phagemid             |         1|2        | 6.520094| 6.568016| 6.598399|
-|WW + phagemid             |         1|3        | 6.494354| 6.505343| 6.557952|
-|WW + phagemid             |         2|1        | 6.611019| 6.615790| 6.646108|
-|WW + phagemid             |         2|2        | 6.594325| 6.646706| 6.657891|
-|WW + phagemid             |         2|3        | 6.459444| 6.460943| 6.491859|
-|WW + phagemid             |         3|1        | 6.354533| 6.362967| 6.364075|
-|WW + phagemid             |         3|2        | 6.402617| 6.406639| 6.427699|
-|WW + phagemid             |         3|3        | 6.533085| 6.557352| 6.557984|
-|WW + phagemid + bleach    |         0|1        | 4.787610| 4.799978| 4.822240|
-|WW + phagemid + bleach    |         0|2        | 4.699030| 4.711744| 4.803847|
-|WW + phagemid + bleach    |         0|3        | 4.641492| 4.839197| 4.869774|
-|WW + phagemid + bleach    |         1|1        | 3.120579| 3.140393| 3.146548|
-|WW + phagemid + bleach    |         1|2        | 3.147717| 3.160030| 3.182765|
-|WW + phagemid + bleach    |         1|3        | 3.422252| 3.494258| 3.521124|
-|WW + phagemid + bleach    |         2|1        | 3.097185| 3.135286| 3.164708|
-|WW + phagemid + bleach    |         2|2        | 3.374681| 3.393167| 3.401482|
-|WW + phagemid + bleach    |         2|3        | 3.322434| 3.332246| 3.405861|
-|WW + phagemid + bleach    |         3|1        | 3.213033| 3.281060| 3.388114|
-|WW + phagemid + bleach    |         3|2        | 2.670230| 3.001952| 3.080523|
-|WW + phagemid + bleach    |         3|3        | 3.373299| 3.426159| 3.436528|
-|WW + phagemid + detergent |         0|1        | 6.380314| 6.387247| 6.394428|
-|WW + phagemid + detergent |         0|2        | 6.487272| 6.506201| 6.508716|
-|WW + phagemid + detergent |         0|3        | 6.353761| 6.415534| 6.464407|
-|WW + phagemid + detergent |         1|1        | 6.280190| 6.300694| 6.310621|
-|WW + phagemid + detergent |         1|2        | 6.267391| 6.308052| 6.327616|
-|WW + phagemid + detergent |         1|3        | 6.243073| 6.404747| 6.442623|
-|WW + phagemid + detergent |         2|1        | 6.273753| 6.300157| 6.303576|
-|WW + phagemid + detergent |         2|2        | 6.253449| 6.314859| 6.339616|
-|WW + phagemid + detergent |         2|3        | 6.440390| 6.464820| 6.490194|
-|WW + phagemid + detergent |         3|1        | 5.816892| 5.828643| 5.853913|
-|WW + phagemid + detergent |         3|2        | 5.866608| 5.878782| 5.933759|
-|WW + phagemid + detergent |         3|3        | 5.231195| 5.287707| 5.290168|
-
-# Plot log concentrations vs time for each condition
-
-First, we plot all the treatment groups on the same timecourse to see differences in absolute as well as relative concentration.
-
-
-```r
-data_concentration |>
-  ggplot(
-    aes(timepoint, log10_concentration, shape = treatment_group, color = treatment_group)
-    ) +
-  geom_point(
-    position = position_jitter(height = 0, width = 0.1, seed = 3579237)
-  )
-```
-
-![plot of chunk unnamed-chunk-12](figure/unnamed-chunk-12-1.png)
-
-Let's look at within- vs between-technical replicate variation:
-
-
-```r
-data_concentration |>
-  ggplot(aes(timepoint,log10_concentration, group = tech_rep)) +
-  stat_summary(
-    fun.min = min,
-    fun.max = max,
-    fun = median,
-    position = position_dodge(width = 0.2),
-    size = 0.2
-    ) +
-  facet_wrap(
-    facets = ~ treatment_group,
-    )
-```
-
-![plot of chunk unnamed-chunk-13](figure/unnamed-chunk-13-1.png)
-
-The variation between treatments is swamping the variation between replicates, so let's let the y-axis vary:
-
-
-```r
-data_concentration |>
-  ggplot(aes(timepoint,log10_concentration, group = tech_rep)) +
-  stat_summary(
-    fun.min = min,
-    fun.max = max,
-    fun = median,
-    position = position_dodge(width = 0.2),
-    size = 0.2
-    ) +
-  facet_wrap(
-    facets = ~ treatment_group,
-    scales = "free_y"
-    )
-```
-
-![plot of chunk unnamed-chunk-14](figure/unnamed-chunk-14-1.png)
-
-It looks like there is sometimes significantly more variation between technical replicates than PCR replicates.
-This suggests that we may want to use a hierarchical model of the error.
-
-# Regression analysis
-
-In this section, we'll look at the trends in concentration over time.
-First, we'll make the approximation that all of the qPCR measurements for a `(treatment_group, timepoint)` pair are independent.
-This is not exactly true because the qPCR replicates of the same technical replicate share the noise of the technical replicate.
-Thus, the error bars on these estimates will be too optimistic.
-Next, we'll make the opposite approximation: that the mean of the qPCR replicates is a single observation.
-In the future, we'll look at a hierarchical model that incorporates the dependency structure of the measurements.
-
-## Treating all observations as independent
-
-We can use a Loess curve to see the trend for each treatment:
-
-```r
-data_concentration |>
-  ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
-  geom_point() +
-  geom_smooth()
-```
-
-```
-## `geom_smooth()` using method = 'loess' and formula = 'y ~ x'
-```
-
-![plot of chunk unnamed-chunk-15](figure/unnamed-chunk-15-1.png)
-
-It's not really appropriate here since our data is non-linear, but we can also use a linear model:
-
-```r
-data_concentration |>
-  ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
-  geom_point() +
-  geom_smooth(
-    method = "lm"
-  )
-```
-
-```
-## `geom_smooth()` using formula = 'y ~ x'
-```
-
-![plot of chunk unnamed-chunk-16](figure/unnamed-chunk-16-1.png)
-
-
-```r
-# TODO: Make this function more generic
-fit_lm_by_treatment <- function(data){
-  treatments <- unique(data$treatment_group)
-  treatments |>
-    map(~ filter(data, treatment_group == .)) |>
-    map(~ lm(log10_concentration ~ timepoint, .)) |>
-    map(tidy) |>
-    map2(
-      treatments,
-      ~ mutate(.x, treatment_group=.y, .before=1)
-      ) |>
-    list_rbind()
-}
-
-models <- fit_lm_by_treatment(data_concentration) |>
-    mutate(collapsed=FALSE, .before=1)
-kable(models)
-```
-
-
-
-|collapsed |treatment_group           |term        |   estimate| std.error|   statistic|   p.value|
-|:---------|:-------------------------|:-----------|----------:|---------:|-----------:|---------:|
-|FALSE     |WW + phagemid             |(Intercept) |  6.5175269| 0.0340310| 191.5175973| 0.0000000|
-|FALSE     |WW + phagemid             |timepoint   | -0.0032189| 0.0181903|  -0.1769585| 0.8605909|
-|FALSE     |WW + phagemid + detergent |(Intercept) |  6.5336741| 0.0662993|  98.5481520| 0.0000000|
-|FALSE     |WW + phagemid + detergent |timepoint   | -0.2270536| 0.0354385|  -6.4069822| 0.0000003|
-|FALSE     |WW + phagemid + bleach    |(Intercept) |  4.3339145| 0.1243730|  34.8461059| 0.0000000|
-|FALSE     |WW + phagemid + bleach    |timepoint   | -0.4668962| 0.0664802|  -7.0230909| 0.0000000|
-|FALSE     |TBS + phagemid            |(Intercept) |  6.8619033| 0.0148942| 460.7106971| 0.0000000|
-|FALSE     |TBS + phagemid            |timepoint   | -0.0336933| 0.0079613|  -4.2321566| 0.0001657|
-
-## Collapsing qPCR replicates
-
-Now, we create a new table that collapses the qPCR replicates:
-
-```r
-data_collapsed <- data_concentration |>
-  group_by(treatment_group, timepoint, tech_rep) |>
-  summarise(log10_concentration = mean(log10_concentration), .groups="drop")
-```
-
-With the collapse, we have wider error bars on our linear estimates.
-Just as the independent approximation meant that the errors were too optimistic, this approximation is too conservative.
-
-
-```r
-data_collapsed |>
-  ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
-  geom_point() +
-  geom_smooth()
-```
-
-```
-## `geom_smooth()` using method = 'loess' and formula = 'y ~ x'
-```
-
-![plot of chunk unnamed-chunk-19](figure/unnamed-chunk-19-1.png)
-
-
-```r
-data_collapsed |>
-  ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
-  geom_point() +
-  geom_smooth(
-    method = "lm"
-  )
-```
-
-```
-## `geom_smooth()` using formula = 'y ~ x'
-```
-
-![plot of chunk unnamed-chunk-20](figure/unnamed-chunk-20-1.png)
-
-We can fit linear models separately for each timepoint and examine the coefficients and standard errors:
-
-
-```r
-models_collapsed <- fit_lm_by_treatment(data_collapsed) |>
-    mutate(collapsed=TRUE, .before=1)
-models_all <- rbind(models, models_collapsed)
-kable(models_all)
-```
-
-
-
-|collapsed |treatment_group           |term        |   estimate| std.error|   statistic|   p.value|
-|:---------|:-------------------------|:-----------|----------:|---------:|-----------:|---------:|
-|FALSE     |WW + phagemid             |(Intercept) |  6.5175269| 0.0340310| 191.5175973| 0.0000000|
-|FALSE     |WW + phagemid             |timepoint   | -0.0032189| 0.0181903|  -0.1769585| 0.8605909|
-|FALSE     |WW + phagemid + detergent |(Intercept) |  6.5336741| 0.0662993|  98.5481520| 0.0000000|
-|FALSE     |WW + phagemid + detergent |timepoint   | -0.2270536| 0.0354385|  -6.4069822| 0.0000003|
-|FALSE     |WW + phagemid + bleach    |(Intercept) |  4.3339145| 0.1243730|  34.8461059| 0.0000000|
-|FALSE     |WW + phagemid + bleach    |timepoint   | -0.4668962| 0.0664802|  -7.0230909| 0.0000000|
-|FALSE     |TBS + phagemid            |(Intercept) |  6.8619033| 0.0148942| 460.7106971| 0.0000000|
-|FALSE     |TBS + phagemid            |timepoint   | -0.0336933| 0.0079613|  -4.2321566| 0.0001657|
-|TRUE      |TBS + phagemid            |(Intercept) |  6.8619033| 0.0210399| 326.1373215| 0.0000000|
-|TRUE      |TBS + phagemid            |timepoint   | -0.0336933| 0.0112463|  -2.9959457| 0.0134364|
-|TRUE      |WW + phagemid             |(Intercept) |  6.5175269| 0.0608769| 107.0607222| 0.0000000|
-|TRUE      |WW + phagemid             |timepoint   | -0.0032189| 0.0325401|  -0.0989220| 0.9231551|
-|TRUE      |WW + phagemid + bleach    |(Intercept) |  4.3339145| 0.2265403|  19.1308805| 0.0000000|
-|TRUE      |WW + phagemid + bleach    |timepoint   | -0.4668962| 0.1210909|  -3.8557511| 0.0031822|
-|TRUE      |WW + phagemid + detergent |(Intercept) |  6.5336741| 0.1208882|  54.0472646| 0.0000000|
-|TRUE      |WW + phagemid + detergent |timepoint   | -0.2270536| 0.0646174|  -3.5138139| 0.0055959|
-
-Collapsing the qPCR replicates increases the standard error of the regression coefficients:
-
-```r
-models_all |>
-  filter(term == "timepoint") |>
-  ggplot(aes(collapsed, std.error, group=treatment_group)) +
-  geom_line(aes(linetype = treatment_group)) +
-  geom_point()
-```
-
-![plot of chunk unnamed-chunk-22](figure/unnamed-chunk-22-1.png)
-
-# Redoing the standard curve
-
-Read the excel file produced by the qPCR machine.
+We would like to transform our `c_t` values to concentrations (or more specifically log concentrations).
+We expect `c_t` to depend on log concentration according to the linear relationship $c_t = a \log(\text{conc}) + b$.
+To estimate the coefficients $a$ and $b$, we use a *standard curve*, a series of qPCR measurements on sequentially diluted samples.
+Note that we expect these coefficients to be phagemid-specific, so we will need to do a standard curve for each phagemid.
+
+## Make the standard curve
+
+Ari did a single dilution series with 10x dilution at each step and three qPCR measurements of each dilution.
+First, we'll read the excel file produced by the qPCR machine.
 We want barcode 18-04, which is "B2" in the file.
 
-We also will convert dilution to log10 concentration.
-In this coding, dilution $d$ is 10x more concentrated than dilution $d-1$.
-We previously saved the expected concentration at $d=0$.
+The samples in this file are labeled by their level of dilution.
+We convert this label to log10 concentration.
+In Ari's coding, dilution $d$ is 10x more concentrated than dilution $d-1$.
+We also need to know the expected concentration at $d=0$.
+In this case it's 0.9871 copies per microliter.
 In the future, we should probably include uncertainty in this value.
 
 
 ```r
+standard_curve_file <- paste(data_dir, "T1_QS2_018_BC49 and T1_QS2_018_BC04.xls", sep="")
+concentration_at_d0 <- 0.9871
+dilution_factor <- 10
+
 sample_name_pattern_standard_curve <- c(
   "^",
   group = "[A-Za-z0-9]+",
@@ -622,8 +290,6 @@ sample_name_pattern_standard_curve <- c(
   dilution = "[0-9]+",
   "$"
 )
-
-standard_curve_file <- paste(data_dir, "T1_QS2_018_BC49 and T1_QS2_018_BC04.xls", sep="")
 
 data_standard_curve <- read_qpcr_excel(standard_curve_file) |>
   separate_wider_regex(
@@ -634,7 +300,7 @@ data_standard_curve <- read_qpcr_excel(standard_curve_file) |>
   mutate(dilution = as.integer(dilution)) |>
   filter(group == "B2") |>
   drop_na(dilution) |>
-  mutate(log10_concentration = log10(concentration_at_d0) + dilution)
+  mutate(log10_concentration = log10(concentration_at_d0) + log10(dilution_factor) * dilution)
 ```
 
 ```
@@ -680,29 +346,29 @@ data_standard_curve |>
 ## Warning: Removed 4 rows containing missing values (`geom_point()`).
 ```
 
-![plot of chunk unnamed-chunk-24](figure/unnamed-chunk-24-1.png)
+![plot of chunk unnamed-chunk-10](figure/unnamed-chunk-10-1.png)
 The common deviations from linearity at each dilution suggests pipetting error in the dilution series in addition to qPCR variation.
 
-Fit linear model.
+Fit a linear model and save the coefficients.
 
 ```r
-standard_curve <- lm(ct ~ dilution, data_standard_curve)
+standard_curve <- lm(ct ~ log10_concentration, data_standard_curve)
 summary(standard_curve)
 ```
 
 ```
 ## 
 ## Call:
-## lm(formula = ct ~ dilution, data = data_standard_curve)
+## lm(formula = ct ~ log10_concentration, data = data_standard_curve)
 ## 
 ## Residuals:
 ##     Min      1Q  Median      3Q     Max 
 ## -1.3603 -0.5192  0.2738  0.6095  0.9971 
 ## 
 ## Coefficients:
-##             Estimate Std. Error t value Pr(>|t|)    
-## (Intercept)  43.4979     0.5292   82.20  < 2e-16 ***
-## dilution     -3.6855     0.1074  -34.33 1.13e-15 ***
+##                     Estimate Std. Error t value Pr(>|t|)    
+## (Intercept)          43.4772     0.5286   82.25  < 2e-16 ***
+## log10_concentration  -3.6855     0.1074  -34.33 1.13e-15 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
@@ -712,8 +378,331 @@ summary(standard_curve)
 ## F-statistic:  1178 on 1 and 15 DF,  p-value: 1.132e-15
 ```
 
-These are the same coefficients that Ari found in Excel.
+```r
+std_curve_slope  <- standard_curve$coefficients["log10_concentration"]
+std_curve_intercept  <- standard_curve$coefficients["(Intercept)"]
+```
 
-A correct model would take into account that errors in dilution propagate to all future dilutions.
+Note: a correct model would take into account that errors in dilution propagate to all future dilutions.
+
+## Apply standard curve
+
+Now we can apply the standard curve to our data.
+We're also going to filter out the negative controls from now on.
+
+
+```r
+data_concentration <- data_tidy |>
+  filter(!control) |>
+  mutate(log10_concentration = (ct - std_curve_intercept) / std_curve_slope)
+kable(head(data_concentration, n = 10))
+```
+
+
+
+|source_file       |       ct|treatment_group | timepoint|tech_rep |well_position | ct_threshold|auto_ct_threshold |target_name |control | log10_concentration|
+|:-----------------|--------:|:---------------|---------:|:--------|:-------------|------------:|:-----------------|:-----------|:-------|-------------------:|
+|data//Plate 1.xls | 20.32065|WW + phagemid   |         0|1        |C1            |          0.2|FALSE             |Barcode_1   |FALSE   |            6.283210|
+|data//Plate 1.xls | 19.76434|WW + phagemid   |         0|2        |C2            |          0.2|FALSE             |Barcode_1   |FALSE   |            6.434158|
+|data//Plate 1.xls | 18.81370|WW + phagemid   |         0|3        |C3            |          0.2|FALSE             |Barcode_1   |FALSE   |            6.692102|
+|data//Plate 1.xls | 18.81602|WW + phagemid   |         1|1        |C4            |          0.2|FALSE             |Barcode_1   |FALSE   |            6.691471|
+|data//Plate 1.xls | 19.44741|WW + phagemid   |         1|2        |C5            |          0.2|FALSE             |Barcode_1   |FALSE   |            6.520152|
+|data//Plate 1.xls | 19.54228|WW + phagemid   |         1|3        |C6            |          0.2|FALSE             |Barcode_1   |FALSE   |            6.494412|
+|data//Plate 1.xls | 18.98299|WW + phagemid   |         2|1        |C7            |          0.2|FALSE             |Barcode_1   |FALSE   |            6.646168|
+|data//Plate 1.xls | 18.98078|WW + phagemid   |         2|2        |C8            |          0.2|FALSE             |Barcode_1   |FALSE   |            6.646766|
+|data//Plate 1.xls | 19.66541|WW + phagemid   |         2|3        |C9            |          0.2|FALSE             |Barcode_1   |FALSE   |            6.461001|
+|data//Plate 1.xls | 20.02242|WW + phagemid   |         3|1        |C10           |          0.2|FALSE             |Barcode_1   |FALSE   |            6.364132|
+
+Since we have three PCR replicates per technical replicate, we can summarize our data with min, median, and max without any loss of information.
+
+
+```r
+data_concentration |>
+  group_by(treatment_group, timepoint, tech_rep) |>
+  summarize(
+    conc_min = min(log10_concentration, na.rm = TRUE),
+    conc_med = median(log10_concentration, na.rm = TRUE),
+    conc_max = max(log10_concentration, na.rm = TRUE),
+    .groups="drop"
+  ) |>
+  kable()
+```
+
+
+
+|treatment_group           | timepoint|tech_rep | conc_min| conc_med| conc_max|
+|:-------------------------|---------:|:--------|--------:|--------:|--------:|
+|TBS + phagemid            |         0|1        | 6.768629| 6.831939| 6.850767|
+|TBS + phagemid            |         0|2        | 6.792594| 6.838014| 6.873845|
+|TBS + phagemid            |         0|3        | 6.685091| 6.888193| 6.901456|
+|TBS + phagemid            |         1|1        | 6.847414| 6.850799| 6.868806|
+|TBS + phagemid            |         1|2        | 6.861752| 6.877301| 6.901897|
+|TBS + phagemid            |         1|3        | 6.847557| 6.853574| 6.869579|
+|TBS + phagemid            |         2|1        | 6.788273| 6.803791| 6.811155|
+|TBS + phagemid            |         2|2        | 6.839764| 6.845615| 6.872852|
+|TBS + phagemid            |         2|3        | 6.838165| 6.838324| 6.846268|
+|TBS + phagemid            |         3|1        | 6.719253| 6.735894| 6.743167|
+|TBS + phagemid            |         3|2        | 6.727330| 6.733523| 6.760886|
+|TBS + phagemid            |         3|3        | 6.682990| 6.705391| 6.709441|
+|WW + phagemid             |         0|1        | 6.283210| 6.314316| 6.323252|
+|WW + phagemid             |         0|2        | 6.386303| 6.406878| 6.434158|
+|WW + phagemid             |         0|3        | 6.523524| 6.671040| 6.692102|
+|WW + phagemid             |         1|1        | 6.651537| 6.684856| 6.691471|
+|WW + phagemid             |         1|2        | 6.520152| 6.568075| 6.598458|
+|WW + phagemid             |         1|3        | 6.494412| 6.505401| 6.558010|
+|WW + phagemid             |         2|1        | 6.611078| 6.615849| 6.646168|
+|WW + phagemid             |         2|2        | 6.594384| 6.646766| 6.657950|
+|WW + phagemid             |         2|3        | 6.459501| 6.461001| 6.491916|
+|WW + phagemid             |         3|1        | 6.354589| 6.363023| 6.364132|
+|WW + phagemid             |         3|2        | 6.402674| 6.406696| 6.427756|
+|WW + phagemid             |         3|3        | 6.533144| 6.557411| 6.558043|
+|WW + phagemid + bleach    |         0|1        | 4.787649| 4.800018| 4.822280|
+|WW + phagemid + bleach    |         0|2        | 4.699068| 4.711782| 4.803886|
+|WW + phagemid + bleach    |         0|3        | 4.641530| 4.839236| 4.869814|
+|WW + phagemid + bleach    |         1|1        | 3.120599| 3.140413| 3.146569|
+|WW + phagemid + bleach    |         1|2        | 3.147737| 3.160051| 3.182787|
+|WW + phagemid + bleach    |         1|3        | 3.422276| 3.494283| 3.521149|
+|WW + phagemid + bleach    |         2|1        | 3.097206| 3.135306| 3.164729|
+|WW + phagemid + bleach    |         2|2        | 3.374704| 3.393190| 3.401506|
+|WW + phagemid + bleach    |         2|3        | 3.322457| 3.332269| 3.405885|
+|WW + phagemid + bleach    |         3|1        | 3.213055| 3.281083| 3.388138|
+|WW + phagemid + bleach    |         3|2        | 2.670246| 3.001971| 3.080543|
+|WW + phagemid + bleach    |         3|3        | 3.373322| 3.426183| 3.436552|
+|WW + phagemid + detergent |         0|1        | 6.380370| 6.387304| 6.394484|
+|WW + phagemid + detergent |         0|2        | 6.487330| 6.506259| 6.508774|
+|WW + phagemid + detergent |         0|3        | 6.353817| 6.415591| 6.464465|
+|WW + phagemid + detergent |         1|1        | 6.280246| 6.300750| 6.310677|
+|WW + phagemid + detergent |         1|2        | 6.267446| 6.308108| 6.327672|
+|WW + phagemid + detergent |         1|3        | 6.243128| 6.404803| 6.442681|
+|WW + phagemid + detergent |         2|1        | 6.273809| 6.300213| 6.303632|
+|WW + phagemid + detergent |         2|2        | 6.253504| 6.314915| 6.339672|
+|WW + phagemid + detergent |         2|3        | 6.440447| 6.464878| 6.490252|
+|WW + phagemid + detergent |         3|1        | 5.816943| 5.828693| 5.853964|
+|WW + phagemid + detergent |         3|2        | 5.866659| 5.878833| 5.933811|
+|WW + phagemid + detergent |         3|3        | 5.231239| 5.287751| 5.290213|
+
+# Plot log concentrations vs time for each condition
+
+First, we plot all the treatment groups on the same timecourse to see differences in absolute as well as relative concentration.
+
+
+```r
+data_concentration |>
+  ggplot(
+    aes(timepoint, log10_concentration, shape = treatment_group, color = treatment_group)
+    ) +
+  geom_point(
+    position = position_jitter(height = 0, width = 0.1, seed = 3579237)
+  )
+```
+
+![plot of chunk unnamed-chunk-14](figure/unnamed-chunk-14-1.png)
+
+Let's look at within- vs between-technical replicate variation:
+
+
+```r
+data_concentration |>
+  ggplot(aes(timepoint,log10_concentration, group = tech_rep)) +
+  stat_summary(
+    fun.min = min,
+    fun.max = max,
+    fun = median,
+    position = position_dodge(width = 0.2),
+    size = 0.2
+    ) +
+  facet_wrap(
+    facets = ~ treatment_group,
+    )
+```
+
+![plot of chunk unnamed-chunk-15](figure/unnamed-chunk-15-1.png)
+
+The variation between treatments is swamping the variation between replicates, so let's let the y-axis vary:
+
+
+```r
+data_concentration |>
+  ggplot(aes(timepoint,log10_concentration, group = tech_rep)) +
+  stat_summary(
+    fun.min = min,
+    fun.max = max,
+    fun = median,
+    position = position_dodge(width = 0.2),
+    size = 0.2
+    ) +
+  facet_wrap(
+    facets = ~ treatment_group,
+    scales = "free_y"
+    )
+```
+
+![plot of chunk unnamed-chunk-16](figure/unnamed-chunk-16-1.png)
+
+It looks like there is sometimes significantly more variation between technical replicates than PCR replicates.
+This suggests that we may want to use a hierarchical model of the error.
+
+# Regression analysis
+
+In this section, we'll look at the trends in concentration over time.
+First, we'll make the approximation that all of the qPCR measurements for a `(treatment_group, timepoint)` pair are independent.
+This is not exactly true because the qPCR replicates of the same technical replicate share the noise of the technical replicate.
+Thus, the error bars on these estimates will be too optimistic.
+Next, we'll make the opposite approximation: that the mean of the qPCR replicates is a single observation.
+In the future, we'll look at a hierarchical model that incorporates the dependency structure of the measurements.
+
+## Treating all observations as independent
+
+We can use a Loess curve to see the trend for each treatment:
+
+```r
+data_concentration |>
+  ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
+  geom_point() +
+  geom_smooth()
+```
+
+```
+## `geom_smooth()` using method = 'loess' and formula = 'y ~ x'
+```
+
+![plot of chunk unnamed-chunk-17](figure/unnamed-chunk-17-1.png)
+
+It's not really appropriate here since our data is non-linear, but we can also use a linear model:
+
+```r
+data_concentration |>
+  ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
+  geom_point() +
+  geom_smooth(
+    method = "lm"
+  )
+```
+
+```
+## `geom_smooth()` using formula = 'y ~ x'
+```
+
+![plot of chunk unnamed-chunk-18](figure/unnamed-chunk-18-1.png)
+
+
+```r
+# TODO: Make this function more generic
+fit_lm_by_treatment <- function(data){
+  treatments <- unique(data$treatment_group)
+  treatments |>
+    map(~ filter(data, treatment_group == .)) |>
+    map(~ lm(log10_concentration ~ timepoint, .)) |>
+    map(tidy) |>
+    map2(
+      treatments,
+      ~ mutate(.x, treatment_group=.y, .before=1)
+      ) |>
+    list_rbind()
+}
+
+models <- fit_lm_by_treatment(data_concentration) |>
+    mutate(collapsed=FALSE, .before=1)
+kable(models)
+```
+
+
+
+|collapsed |treatment_group           |term        |   estimate| std.error|   statistic|   p.value|
+|:---------|:-------------------------|:-----------|----------:|---------:|-----------:|---------:|
+|FALSE     |WW + phagemid             |(Intercept) |  6.5175850| 0.0340313| 191.5171920| 0.0000000|
+|FALSE     |WW + phagemid             |timepoint   | -0.0032190| 0.0181905|  -0.1769585| 0.8605909|
+|FALSE     |WW + phagemid + detergent |(Intercept) |  6.5337324| 0.0663000|  98.5479440| 0.0000000|
+|FALSE     |WW + phagemid + detergent |timepoint   | -0.2270561| 0.0354389|  -6.4069822| 0.0000003|
+|FALSE     |WW + phagemid + bleach    |(Intercept) |  4.3339485| 0.1243744|  34.8459951| 0.0000000|
+|FALSE     |WW + phagemid + bleach    |timepoint   | -0.4669014| 0.0664809|  -7.0230909| 0.0000000|
+|FALSE     |TBS + phagemid            |(Intercept) |  6.8619652| 0.0148943| 460.7097711| 0.0000000|
+|FALSE     |TBS + phagemid            |timepoint   | -0.0336937| 0.0079614|  -4.2321566| 0.0001657|
+
+## Collapsing qPCR replicates
+
+Now, we create a new table that collapses the qPCR replicates:
+
+```r
+data_collapsed <- data_concentration |>
+  group_by(treatment_group, timepoint, tech_rep) |>
+  summarise(log10_concentration = mean(log10_concentration), .groups="drop")
+```
+
+With the collapse, we have wider error bars on our linear estimates.
+Just as the independent approximation meant that the errors were too optimistic, this approximation is too conservative.
+
+
+```r
+data_collapsed |>
+  ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
+  geom_point() +
+  geom_smooth()
+```
+
+```
+## `geom_smooth()` using method = 'loess' and formula = 'y ~ x'
+```
+
+![plot of chunk unnamed-chunk-21](figure/unnamed-chunk-21-1.png)
+
+
+```r
+data_collapsed |>
+  ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
+  geom_point() +
+  geom_smooth(
+    method = "lm"
+  )
+```
+
+```
+## `geom_smooth()` using formula = 'y ~ x'
+```
+
+![plot of chunk unnamed-chunk-22](figure/unnamed-chunk-22-1.png)
+
+We can fit linear models separately for each timepoint and examine the coefficients and standard errors:
+
+
+```r
+models_collapsed <- fit_lm_by_treatment(data_collapsed) |>
+    mutate(collapsed=TRUE, .before=1)
+models_all <- rbind(models, models_collapsed)
+kable(models_all)
+```
+
+
+
+|collapsed |treatment_group           |term        |   estimate| std.error|   statistic|   p.value|
+|:---------|:-------------------------|:-----------|----------:|---------:|-----------:|---------:|
+|FALSE     |WW + phagemid             |(Intercept) |  6.5175850| 0.0340313| 191.5171920| 0.0000000|
+|FALSE     |WW + phagemid             |timepoint   | -0.0032190| 0.0181905|  -0.1769585| 0.8605909|
+|FALSE     |WW + phagemid + detergent |(Intercept) |  6.5337324| 0.0663000|  98.5479440| 0.0000000|
+|FALSE     |WW + phagemid + detergent |timepoint   | -0.2270561| 0.0354389|  -6.4069822| 0.0000003|
+|FALSE     |WW + phagemid + bleach    |(Intercept) |  4.3339485| 0.1243744|  34.8459951| 0.0000000|
+|FALSE     |WW + phagemid + bleach    |timepoint   | -0.4669014| 0.0664809|  -7.0230909| 0.0000000|
+|FALSE     |TBS + phagemid            |(Intercept) |  6.8619652| 0.0148943| 460.7097711| 0.0000000|
+|FALSE     |TBS + phagemid            |timepoint   | -0.0336937| 0.0079614|  -4.2321566| 0.0001657|
+|TRUE      |TBS + phagemid            |(Intercept) |  6.8619652| 0.0210402| 326.1366660| 0.0000000|
+|TRUE      |TBS + phagemid            |timepoint   | -0.0336937| 0.0112464|  -2.9959457| 0.0134364|
+|TRUE      |WW + phagemid             |(Intercept) |  6.5175850| 0.0608776| 107.0604957| 0.0000000|
+|TRUE      |WW + phagemid             |timepoint   | -0.0032190| 0.0325404|  -0.0989220| 0.9231551|
+|TRUE      |WW + phagemid + bleach    |(Intercept) |  4.3339485| 0.2265427|  19.1308196| 0.0000000|
+|TRUE      |WW + phagemid + bleach    |timepoint   | -0.4669014| 0.1210922|  -3.8557511| 0.0031822|
+|TRUE      |WW + phagemid + detergent |(Intercept) |  6.5337324| 0.1208895|  54.0471506| 0.0000000|
+|TRUE      |WW + phagemid + detergent |timepoint   | -0.2270561| 0.0646181|  -3.5138139| 0.0055959|
+
+Collapsing the qPCR replicates increases the standard error of the regression coefficients:
+
+```r
+models_all |>
+  filter(term == "timepoint") |>
+  ggplot(aes(collapsed, std.error, group=treatment_group)) +
+  geom_line(aes(linetype = treatment_group)) +
+  geom_point()
+```
+
+![plot of chunk unnamed-chunk-24](figure/unnamed-chunk-24-1.png)
 
 # Hierarchical model with error propagation [TODO]

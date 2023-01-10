@@ -166,38 +166,80 @@ data_tidy |>
 
 # Convert raw Ct values to concentrations
 
-From Ari's Excel sheet, we have the following steps:
+We would like to transform our `c_t` values to concentrations (or more specifically log concentrations).
+We expect `c_t` to depend on log concentration according to the linear relationship $c_t = a \log(\text{conc}) + b$.
+To estimate the coefficients $a$ and $b$, we use a *standard curve*, a series of qPCR measurements on sequentially diluted samples.
+Note that we expect these coefficients to be phagemid-specific, so we will need to do a standard curve for each phagemid.
 
-1. Use the regression coefficients from the standard to convert Ct values to "dilution" (this is a linear relationship $c_t = a d + b$)
-2. Convert dilution to concentration (in copies per microliter) using $\text{concentration} = C e^{\log(f_d) d}$, where $f_d$ is the fold-dilution at each dilution. In this case, $f_d = 10$.
+## Make the standard curve
 
-The variable $d$ labels the level of dilution where 9 is a 10x dilution of the original sample, 8 is 10x of dilution 9, etc.
-By implication, the coefficient $C$ is the expected concentration at dilution 0, i.e. the original concentration times $10^{10}$.
+Ari did a single dilution series with 10x dilution at each step and three qPCR measurements of each dilution.
+First, we'll read the excel file produced by the qPCR machine.
+We want barcode 18-04, which is "B2" in the file.
 
-Note that the coefficients $a$, $b$, and $C$, are phagemid-specific.
-The first two are estimated from the standard curve.
-$C$ is known from the experimental protocol.
-In the future we would like estimate these concentrations directly in this workflow.
+The samples in this file are labeled by their level of dilution.
+We convert this label to log10 concentration.
+In Ari's coding, dilution $d$ is 10x more concentrated than dilution $d-1$.
+We also need to know the expected concentration at $d=0$.
+In this case it's 0.9871 copies per microliter.
+In the future, we should probably include uncertainty in this value.
 
-We need to specify these coefficients:
 ```{r}
-std_curve_slope <- -3.6855
-std_curve_intercept <- 43.498
+standard_curve_file <- paste(data_dir, "T1_QS2_018_BC49 and T1_QS2_018_BC04.xls", sep="")
 concentration_at_d0 <- 0.9871
 dilution_factor <- 10
+
+sample_name_pattern_standard_curve <- c(
+  "^",
+  group = "[A-Za-z0-9]+",
+  "_D",
+  dilution = "[0-9]+",
+  "$"
+)
+
+data_standard_curve <- read_qpcr_excel(standard_curve_file) |>
+  separate_wider_regex(
+    sample_name,
+    patterns = sample_name_pattern_standard_curve,
+    too_few = "align_start"
+  ) |>
+  mutate(dilution = as.integer(dilution)) |>
+  filter(group == "B2") |>
+  drop_na(dilution) |>
+  mutate(log10_concentration = log10(concentration_at_d0) + log10(dilution_factor) * dilution)
+
+kable(head(data_standard_curve, n = 10))
+
 ```
 
-We'll apply the two equations in separate steps so we can compare intermediate values with Ari's spreadsheet. Eventually, we'll condense this into one conversion.
+```{r}
+data_standard_curve |>
+  ggplot(mapping = aes(log10_concentration, ct)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+```
+The common deviations from linearity at each dilution suggests pipetting error in the dilution series in addition to qPCR variation.
 
+Fit a linear model and save the coefficients.
+```{r}
+standard_curve <- lm(ct ~ log10_concentration, data_standard_curve)
+summary(standard_curve)
+
+std_curve_slope  <- standard_curve$coefficients["log10_concentration"]
+std_curve_intercept  <- standard_curve$coefficients["(Intercept)"]
+```
+
+Note: a correct model would take into account that errors in dilution propagate to all future dilutions.
+
+## Apply standard curve
+
+Now we can apply the standard curve to our data.
 We're also going to filter out the negative controls from now on.
 
 ```{r}
 data_concentration <- data_tidy |>
   filter(!control) |>
-  mutate(
-    dilution = (ct - std_curve_intercept) / std_curve_slope,
-    log10_concentration = log10(concentration_at_d0) + log10(dilution_factor) * dilution,
-  )
+  mutate(log10_concentration = (ct - std_curve_intercept) / std_curve_slope)
 kable(head(data_concentration, n = 10))
 ```
 
@@ -361,59 +403,5 @@ models_all |>
   geom_line(aes(linetype = treatment_group)) +
   geom_point()
 ```
-
-# Redoing the standard curve
-
-Read the excel file produced by the qPCR machine.
-We want barcode 18-04, which is "B2" in the file.
-
-We also will convert dilution to log10 concentration.
-In this coding, dilution $d$ is 10x more concentrated than dilution $d-1$.
-We previously saved the expected concentration at $d=0$.
-In the future, we should probably include uncertainty in this value.
-
-```{r}
-sample_name_pattern_standard_curve <- c(
-  "^",
-  group = "[A-Za-z0-9]+",
-  "_D",
-  dilution = "[0-9]+",
-  "$"
-)
-
-standard_curve_file <- paste(data_dir, "T1_QS2_018_BC49 and T1_QS2_018_BC04.xls", sep="")
-
-data_standard_curve <- read_qpcr_excel(standard_curve_file) |>
-  separate_wider_regex(
-    sample_name,
-    patterns = sample_name_pattern_standard_curve,
-    too_few = "align_start"
-  ) |>
-  mutate(dilution = as.integer(dilution)) |>
-  filter(group == "B2") |>
-  drop_na(dilution) |>
-  mutate(log10_concentration = log10(concentration_at_d0) + dilution)
-
-kable(head(data_standard_curve, n = 10))
-
-```
-
-```{r}
-data_standard_curve |>
-  ggplot(mapping = aes(log10_concentration, ct)) +
-  geom_point() +
-  geom_smooth(method = "lm")
-```
-The common deviations from linearity at each dilution suggests pipetting error in the dilution series in addition to qPCR variation.
-
-Fit linear model.
-```{r}
-standard_curve <- lm(ct ~ dilution, data_standard_curve)
-summary(standard_curve)
-```
-
-These are the same coefficients that Ari found in Excel.
-
-A correct model would take into account that errors in dilution propagate to all future dilutions.
 
 # Hierarchical model with error propagation [TODO]
