@@ -6,20 +6,6 @@ output: github_document
 
 ```r
 library(tidyverse)
-```
-
-```
-## ── Attaching packages ─────────────────────────────────────────────────────────── tidyverse 1.3.2 ──
-## ✔ ggplot2 3.4.0             ✔ purrr   0.9000.0.9000
-## ✔ tibble  3.1.8             ✔ dplyr   1.0.10       
-## ✔ tidyr   1.2.1.9001        ✔ stringr 1.5.0.9000   
-## ✔ readr   2.1.3             ✔ forcats 0.5.2        
-## ── Conflicts ────────────────────────────────────────────────────────────── tidyverse_conflicts() ──
-## ✖ dplyr::filter() masks stats::filter()
-## ✖ dplyr::lag()    masks stats::lag()
-```
-
-```r
 library(readxl)
 library(broom)
 library(knitr)
@@ -35,49 +21,7 @@ Eventually, we might want to automate access to the data, but for now, we'll man
 
 For each plate, we'll read the "Results" sheet.
 The first 42 rows of the sheet are metadata that we don't need, so we'll skip them.
-We'll also save the path in a column called "source" so we can look for plate effects if we'd like after we merge files.
-
-```r
-read_qpcr_excel <- function(path) {
-  read_excel(
-    path = path,
-    sheet = "Results",
-    skip = 42
-  ) |>
-    mutate(source = path)
-}
-```
-
-
-```r
-data_dir <- "data/"
-filename_pattern <- "Plate [0-9]+[.]xls"
-data_raw <- list.files(
-  data_dir,
-  pattern = filename_pattern,
-  full.names = TRUE
-  ) |>
-  map(read_qpcr_excel) |>
-  list_rbind()
-kable(head(data_raw, n = 10))
-```
-
-
-
-| Well|Well Position |Omit  |Sample Name |Target Name   |Task    |Reporter |Quencher |CT                 |  Ct Mean|     Ct SD|Quantity |Quantity Mean |Quantity SD |Y-Intercept |R(superscript 2) |Slope |Efficiency |Automatic Ct Threshold | Ct Threshold|Automatic Baseline | Baseline Start| Baseline End|Amp Status   |Comments |   Cq Conf|Target Color   |CQCONF |EXPFAIL |HIGHSD |NOAMP |NOISE |source            |BADROX |
-|----:|:-------------|:-----|:-----------|:-------------|:-------|:--------|:--------|:------------------|--------:|---------:|:--------|:-------------|:-----------|:-----------|:----------------|:-----|:----------|:----------------------|------------:|:------------------|--------------:|------------:|:------------|:--------|---------:|:--------------|:------|:-------|:------|:-----|:-----|:-----------------|:------|
-|    1|A1            |FALSE |Blank       |Blank         |UNKNOWN |FAM      |NFQ-MGB  |Undetermined       |       NA|        NA|NA       |NA            |NA          |NA          |NA               |NA    |NA         |FALSE                  |          0.2|TRUE               |              3|           15|No Amp       |NA       | 0.0000000|RGB(0,139,69)  |Y      |N       |N      |N     |N     |data//Plate 1.xls |NA     |
-|    2|A2            |FALSE |Blank       |Blank         |UNKNOWN |FAM      |NFQ-MGB  |Undetermined       |       NA|        NA|NA       |NA            |NA          |NA          |NA               |NA    |NA         |FALSE                  |          0.2|TRUE               |              3|           22|No Amp       |NA       | 0.0000000|RGB(0,139,69)  |Y      |N       |N      |N     |Y     |data//Plate 1.xls |NA     |
-|    3|A3            |FALSE |Blank       |Blank         |UNKNOWN |FAM      |NFQ-MGB  |Undetermined       |       NA|        NA|NA       |NA            |NA          |NA          |NA               |NA    |NA         |FALSE                  |          0.2|TRUE               |              3|           39|Inconclusive |NA       | 0.0000000|RGB(0,139,69)  |Y      |Y       |N      |N     |Y     |data//Plate 1.xls |NA     |
-|   13|B1            |FALSE |B1_NTC      |Barcode_1_NTC |UNKNOWN |FAM      |NFQ-MGB  |35.921939849853516 | 36.35009| 0.6055012|NA       |NA            |NA          |NA          |NA               |NA    |NA         |FALSE                  |          0.2|TRUE               |              3|           30|Inconclusive |NA       | 0.9320759|RGB(0,139,69)  |N      |N       |Y      |N     |N     |data//Plate 1.xls |NA     |
-|   14|B2            |FALSE |B1_NTC      |Barcode_1_NTC |UNKNOWN |FAM      |NFQ-MGB  |Undetermined       | 36.35009| 0.6055012|NA       |NA            |NA          |NA          |NA               |NA    |NA         |FALSE                  |          0.2|TRUE               |              3|           39|No Amp       |NA       | 0.0000000|RGB(0,139,69)  |Y      |Y       |N      |Y     |N     |data//Plate 1.xls |NA     |
-|   15|B3            |FALSE |B1_NTC      |Barcode_1_NTC |UNKNOWN |FAM      |NFQ-MGB  |36.778247833251953 | 36.35009| 0.6055012|NA       |NA            |NA          |NA          |NA               |NA    |NA         |FALSE                  |          0.2|TRUE               |              3|           31|Inconclusive |NA       | 0.9147403|RGB(0,139,69)  |N      |N       |Y      |N     |N     |data//Plate 1.xls |NA     |
-|   25|C1            |FALSE |A0.1        |Barcode_1     |UNKNOWN |FAM      |NFQ-MGB  |20.320652008056641 | 20.23325| 0.0774648|NA       |NA            |NA          |NA          |NA               |NA    |NA         |FALSE                  |          0.2|TRUE               |              3|           16|Amp          |NA       | 0.9699352|RGB(176,23,31) |N      |N       |N      |N     |N     |data//Plate 1.xls |NA     |
-|   26|C2            |FALSE |A0.2        |Barcode_1     |UNKNOWN |FAM      |NFQ-MGB  |19.764341354370117 | 19.85664| 0.0884714|NA       |NA            |NA          |NA          |NA               |NA    |NA         |FALSE                  |          0.2|TRUE               |              3|           14|Amp          |NA       | 0.9626578|RGB(176,23,31) |N      |N       |N      |N     |N     |data//Plate 1.xls |NA     |
-|   27|C3            |FALSE |A0.3        |Barcode_1     |UNKNOWN |FAM      |NFQ-MGB  |18.813695907592773 | 19.04667| 0.3385253|NA       |NA            |NA          |NA          |NA               |NA    |NA         |FALSE                  |          0.2|TRUE               |              3|           13|Amp          |NA       | 0.9706940|RGB(176,23,31) |N      |N       |N      |N     |N     |data//Plate 1.xls |NA     |
-|   28|C4            |FALSE |A1.1        |Barcode_1     |UNKNOWN |FAM      |NFQ-MGB  |18.816024780273438 | 18.87321| 0.0788805|NA       |NA            |NA          |NA          |NA               |NA    |NA         |FALSE                  |          0.2|TRUE               |              3|           13|Amp          |NA       | 0.9645014|RGB(176,23,31) |N      |N       |N      |N     |N     |data//Plate 1.xls |NA     |
-
-## Tidy the data
+We'll also save the path in a column called "source_file" so we can look for plate effects if we'd like after we merge files.
 
 We're only going to keep a subset of columns.
 In the next block we extract the columns we want and convert them to the correct datatypes.
@@ -95,8 +39,14 @@ In the future we may want to redo the baseline subtraction manually, but for now
 
 
 ```r
-data_extracted <- data_raw |>
+read_qpcr_excel <- function(path) {
+  read_excel(
+    path = path,
+    sheet = "Results",
+    skip = 42
+  ) |>
   transmute(
+    source_file = path,
     ct = as.numeric(CT),
     sample_name = `Sample Name`,
     well_position = `Well Position`,
@@ -104,39 +54,56 @@ data_extracted <- data_raw |>
     auto_ct_threshold = `Automatic Ct Threshold`,
     target_name = as.factor(`Target Name`)
   )
+}
+```
+TODO: It would be nice to specify what values to convert to `NA` quietly.
+
+
+```r
+data_dir <- "data/"
+filename_pattern <- "Plate [0-9]+[.]xls"
+data_raw <- list.files(
+  data_dir,
+  pattern = filename_pattern,
+  full.names = TRUE
+  ) |>
+  map(read_qpcr_excel) |>
+  list_rbind()
 ```
 
 ```
 ## Warning in mask$eval_all_mutate(quo): NAs introduced by coercion
+
+## Warning in mask$eval_all_mutate(quo): NAs introduced by coercion
+
+## Warning in mask$eval_all_mutate(quo): NAs introduced by coercion
 ```
 
 ```r
-kable(head(data_extracted, n = 10))
+kable(head(data_raw, n = 10))
 ```
 
 
 
-|       ct|sample_name |well_position | ct_threshold|auto_ct_threshold |target_name   |
-|--------:|:-----------|:-------------|------------:|:-----------------|:-------------|
-|       NA|Blank       |A1            |          0.2|FALSE             |Blank         |
-|       NA|Blank       |A2            |          0.2|FALSE             |Blank         |
-|       NA|Blank       |A3            |          0.2|FALSE             |Blank         |
-| 35.92194|B1_NTC      |B1            |          0.2|FALSE             |Barcode_1_NTC |
-|       NA|B1_NTC      |B2            |          0.2|FALSE             |Barcode_1_NTC |
-| 36.77825|B1_NTC      |B3            |          0.2|FALSE             |Barcode_1_NTC |
-| 20.32065|A0.1        |C1            |          0.2|FALSE             |Barcode_1     |
-| 19.76434|A0.2        |C2            |          0.2|FALSE             |Barcode_1     |
-| 18.81370|A0.3        |C3            |          0.2|FALSE             |Barcode_1     |
-| 18.81602|A1.1        |C4            |          0.2|FALSE             |Barcode_1     |
-
-TODO: It would be nice to specify what values to convert to `NA` quietly.
+|source_file       |       ct|sample_name |well_position | ct_threshold|auto_ct_threshold |target_name   |
+|:-----------------|--------:|:-----------|:-------------|------------:|:-----------------|:-------------|
+|data//Plate 1.xls |       NA|Blank       |A1            |          0.2|FALSE             |Blank         |
+|data//Plate 1.xls |       NA|Blank       |A2            |          0.2|FALSE             |Blank         |
+|data//Plate 1.xls |       NA|Blank       |A3            |          0.2|FALSE             |Blank         |
+|data//Plate 1.xls | 35.92194|B1_NTC      |B1            |          0.2|FALSE             |Barcode_1_NTC |
+|data//Plate 1.xls |       NA|B1_NTC      |B2            |          0.2|FALSE             |Barcode_1_NTC |
+|data//Plate 1.xls | 36.77825|B1_NTC      |B3            |          0.2|FALSE             |Barcode_1_NTC |
+|data//Plate 1.xls | 20.32065|A0.1        |C1            |          0.2|FALSE             |Barcode_1     |
+|data//Plate 1.xls | 19.76434|A0.2        |C2            |          0.2|FALSE             |Barcode_1     |
+|data//Plate 1.xls | 18.81370|A0.3        |C3            |          0.2|FALSE             |Barcode_1     |
+|data//Plate 1.xls | 18.81602|A1.1        |C4            |          0.2|FALSE             |Barcode_1     |
 
 For quality control, let's check assertions our assertions about about `ct_threshold` and `autothreshold`.
 
 
 ```r
 expected_ct_threshold <- 0.2
-data_extracted |>
+data_raw |>
   summarize(
     all_auto_ct_theshold_false = all(!auto_ct_threshold),
     all_ct_theshold_expected = all(ct_threshold == expected_ct_threshold)
@@ -149,6 +116,8 @@ data_extracted |>
 ##   <lgl>                      <lgl>                   
 ## 1 TRUE                       TRUE
 ```
+
+## Tidy the data
 
 Currently we have the `sample_name` column, which contains three pieces of information: the experiment (e.g., "A", "B", ...), the timepoint, and the technical replicate number.
 To make the data tidier, we'll split this into separate columns.
@@ -187,7 +156,7 @@ sample_name_pattern = c(
   "$"
 )
 
-data_tidy <- data_extracted |>
+data_tidy <- data_raw |>
   mutate(
     sample_name = str_replace(sample_name, "B1_NTC", "NTC")
   ) |>
@@ -207,18 +176,18 @@ kable(head(data_tidy, n = 10))
 
 
 
-|       ct|treatment_group | timepoint|tech_rep |well_position | ct_threshold|auto_ct_threshold |target_name   |control |
-|--------:|:---------------|---------:|:--------|:-------------|------------:|:-----------------|:-------------|:-------|
-|       NA|Blank           |        NA|NA       |A1            |          0.2|FALSE             |Blank         |TRUE    |
-|       NA|Blank           |        NA|NA       |A2            |          0.2|FALSE             |Blank         |TRUE    |
-|       NA|Blank           |        NA|NA       |A3            |          0.2|FALSE             |Blank         |TRUE    |
-| 35.92194|NTC             |        NA|NA       |B1            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
-|       NA|NTC             |        NA|NA       |B2            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
-| 36.77825|NTC             |        NA|NA       |B3            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
-| 20.32065|WW + phagemid   |         0|1        |C1            |          0.2|FALSE             |Barcode_1     |FALSE   |
-| 19.76434|WW + phagemid   |         0|2        |C2            |          0.2|FALSE             |Barcode_1     |FALSE   |
-| 18.81370|WW + phagemid   |         0|3        |C3            |          0.2|FALSE             |Barcode_1     |FALSE   |
-| 18.81602|WW + phagemid   |         1|1        |C4            |          0.2|FALSE             |Barcode_1     |FALSE   |
+|source_file       |       ct|treatment_group | timepoint|tech_rep |well_position | ct_threshold|auto_ct_threshold |target_name   |control |
+|:-----------------|--------:|:---------------|---------:|:--------|:-------------|------------:|:-----------------|:-------------|:-------|
+|data//Plate 1.xls |       NA|Blank           |        NA|NA       |A1            |          0.2|FALSE             |Blank         |TRUE    |
+|data//Plate 1.xls |       NA|Blank           |        NA|NA       |A2            |          0.2|FALSE             |Blank         |TRUE    |
+|data//Plate 1.xls |       NA|Blank           |        NA|NA       |A3            |          0.2|FALSE             |Blank         |TRUE    |
+|data//Plate 1.xls | 35.92194|NTC             |        NA|NA       |B1            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
+|data//Plate 1.xls |       NA|NTC             |        NA|NA       |B2            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
+|data//Plate 1.xls | 36.77825|NTC             |        NA|NA       |B3            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
+|data//Plate 1.xls | 20.32065|WW + phagemid   |         0|1        |C1            |          0.2|FALSE             |Barcode_1     |FALSE   |
+|data//Plate 1.xls | 19.76434|WW + phagemid   |         0|2        |C2            |          0.2|FALSE             |Barcode_1     |FALSE   |
+|data//Plate 1.xls | 18.81370|WW + phagemid   |         0|3        |C3            |          0.2|FALSE             |Barcode_1     |FALSE   |
+|data//Plate 1.xls | 18.81602|WW + phagemid   |         1|1        |C4            |          0.2|FALSE             |Barcode_1     |FALSE   |
 
 Let's make sure we have 9 blanks and NTCs (3 per plate) and 36 of the other treatments (3 pcr replicates * 3 technical replicates * 4 timepoints).
 
@@ -251,26 +220,26 @@ data_tidy |>
 
 
 
-|        ct|treatment_group | timepoint|tech_rep |well_position | ct_threshold|auto_ct_threshold |target_name   |control |
-|---------:|:---------------|---------:|:--------|:-------------|------------:|:-----------------|:-------------|:-------|
-|        NA|Blank           |        NA|NA       |A1            |          0.2|FALSE             |Blank         |TRUE    |
-|        NA|Blank           |        NA|NA       |A2            |          0.2|FALSE             |Blank         |TRUE    |
-|        NA|Blank           |        NA|NA       |A3            |          0.2|FALSE             |Blank         |TRUE    |
-| 35.921940|NTC             |        NA|NA       |B1            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
-|        NA|NTC             |        NA|NA       |B2            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
-| 36.778248|NTC             |        NA|NA       |B3            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
-| 33.499622|Blank           |        NA|NA       |A1            |          0.2|FALSE             |Blank         |TRUE    |
-|        NA|Blank           |        NA|NA       |A2            |          0.2|FALSE             |Blank         |TRUE    |
-|  6.357395|Blank           |        NA|NA       |A3            |          0.2|FALSE             |Blank         |TRUE    |
-|        NA|NTC             |        NA|NA       |B1            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
-|        NA|NTC             |        NA|NA       |B2            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
-|        NA|NTC             |        NA|NA       |B3            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
-|        NA|Blank           |        NA|NA       |A1            |          0.2|FALSE             |Blank         |TRUE    |
-|        NA|Blank           |        NA|NA       |A2            |          0.2|FALSE             |Blank         |TRUE    |
-|        NA|Blank           |        NA|NA       |A3            |          0.2|FALSE             |Blank         |TRUE    |
-| 39.660065|NTC             |        NA|NA       |B1            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
-|        NA|NTC             |        NA|NA       |B2            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
-| 37.288032|NTC             |        NA|NA       |B3            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
+|source_file       |        ct|treatment_group | timepoint|tech_rep |well_position | ct_threshold|auto_ct_threshold |target_name   |control |
+|:-----------------|---------:|:---------------|---------:|:--------|:-------------|------------:|:-----------------|:-------------|:-------|
+|data//Plate 1.xls |        NA|Blank           |        NA|NA       |A1            |          0.2|FALSE             |Blank         |TRUE    |
+|data//Plate 1.xls |        NA|Blank           |        NA|NA       |A2            |          0.2|FALSE             |Blank         |TRUE    |
+|data//Plate 1.xls |        NA|Blank           |        NA|NA       |A3            |          0.2|FALSE             |Blank         |TRUE    |
+|data//Plate 1.xls | 35.921940|NTC             |        NA|NA       |B1            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
+|data//Plate 1.xls |        NA|NTC             |        NA|NA       |B2            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
+|data//Plate 1.xls | 36.778248|NTC             |        NA|NA       |B3            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
+|data//Plate 2.xls | 33.499622|Blank           |        NA|NA       |A1            |          0.2|FALSE             |Blank         |TRUE    |
+|data//Plate 2.xls |        NA|Blank           |        NA|NA       |A2            |          0.2|FALSE             |Blank         |TRUE    |
+|data//Plate 2.xls |  6.357395|Blank           |        NA|NA       |A3            |          0.2|FALSE             |Blank         |TRUE    |
+|data//Plate 2.xls |        NA|NTC             |        NA|NA       |B1            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
+|data//Plate 2.xls |        NA|NTC             |        NA|NA       |B2            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
+|data//Plate 2.xls |        NA|NTC             |        NA|NA       |B3            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
+|data//Plate 3.xls |        NA|Blank           |        NA|NA       |A1            |          0.2|FALSE             |Blank         |TRUE    |
+|data//Plate 3.xls |        NA|Blank           |        NA|NA       |A2            |          0.2|FALSE             |Blank         |TRUE    |
+|data//Plate 3.xls |        NA|Blank           |        NA|NA       |A3            |          0.2|FALSE             |Blank         |TRUE    |
+|data//Plate 3.xls | 39.660065|NTC             |        NA|NA       |B1            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
+|data//Plate 3.xls |        NA|NTC             |        NA|NA       |B2            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
+|data//Plate 3.xls | 37.288032|NTC             |        NA|NA       |B3            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
 
 We can make a boxplot to compare the distribution of ct across treatments.
 To disply the NAs, we'll set them to one more than the maximum possible values.
@@ -286,7 +255,7 @@ data_tidy |>
   geom_boxplot()
 ```
 
-![plot of chunk unnamed-chunk-9](figure/unnamed-chunk-9-1.png)
+![plot of chunk unnamed-chunk-8](figure/unnamed-chunk-8-1.png)
 
 # Convert raw Ct values to concentrations
 
@@ -329,18 +298,18 @@ kable(head(data_concentration, n = 10))
 
 
 
-|       ct|treatment_group | timepoint|tech_rep |well_position | ct_threshold|auto_ct_threshold |target_name |control | dilution| log10_concentration|
-|--------:|:---------------|---------:|:--------|:-------------|------------:|:-----------------|:-----------|:-------|--------:|-------------------:|
-| 20.32065|WW + phagemid   |         0|1        |C1            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.288793|            6.283155|
-| 19.76434|WW + phagemid   |         0|2        |C2            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.439739|            6.434100|
-| 18.81370|WW + phagemid   |         0|3        |C3            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.697681|            6.692042|
-| 18.81602|WW + phagemid   |         1|1        |C4            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.697049|            6.691410|
-| 19.44741|WW + phagemid   |         1|2        |C5            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.525733|            6.520094|
-| 19.54228|WW + phagemid   |         1|3        |C6            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.499993|            6.494354|
-| 18.98299|WW + phagemid   |         2|1        |C7            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.651747|            6.646108|
-| 18.98078|WW + phagemid   |         2|2        |C8            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.652345|            6.646706|
-| 19.66541|WW + phagemid   |         2|3        |C9            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.466582|            6.460943|
-| 20.02242|WW + phagemid   |         3|1        |C10           |          0.2|FALSE             |Barcode_1   |FALSE   | 6.369714|            6.364075|
+|source_file       |       ct|treatment_group | timepoint|tech_rep |well_position | ct_threshold|auto_ct_threshold |target_name |control | dilution| log10_concentration|
+|:-----------------|--------:|:---------------|---------:|:--------|:-------------|------------:|:-----------------|:-----------|:-------|--------:|-------------------:|
+|data//Plate 1.xls | 20.32065|WW + phagemid   |         0|1        |C1            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.288793|            6.283155|
+|data//Plate 1.xls | 19.76434|WW + phagemid   |         0|2        |C2            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.439739|            6.434100|
+|data//Plate 1.xls | 18.81370|WW + phagemid   |         0|3        |C3            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.697681|            6.692042|
+|data//Plate 1.xls | 18.81602|WW + phagemid   |         1|1        |C4            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.697049|            6.691410|
+|data//Plate 1.xls | 19.44741|WW + phagemid   |         1|2        |C5            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.525733|            6.520094|
+|data//Plate 1.xls | 19.54228|WW + phagemid   |         1|3        |C6            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.499993|            6.494354|
+|data//Plate 1.xls | 18.98299|WW + phagemid   |         2|1        |C7            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.651747|            6.646108|
+|data//Plate 1.xls | 18.98078|WW + phagemid   |         2|2        |C8            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.652345|            6.646706|
+|data//Plate 1.xls | 19.66541|WW + phagemid   |         2|3        |C9            |          0.2|FALSE             |Barcode_1   |FALSE   | 6.466582|            6.460943|
+|data//Plate 1.xls | 20.02242|WW + phagemid   |         3|1        |C10           |          0.2|FALSE             |Barcode_1   |FALSE   | 6.369714|            6.364075|
 
 Since we have three PCR replicates per technical replicate, we can summarize our data with min, median, and max without any loss of information.
 
@@ -425,7 +394,7 @@ data_concentration |>
   )
 ```
 
-![plot of chunk unnamed-chunk-13](figure/unnamed-chunk-13-1.png)
+![plot of chunk unnamed-chunk-12](figure/unnamed-chunk-12-1.png)
 
 Let's look at within- vs between-technical replicate variation:
 
@@ -445,7 +414,7 @@ data_concentration |>
     )
 ```
 
-![plot of chunk unnamed-chunk-14](figure/unnamed-chunk-14-1.png)
+![plot of chunk unnamed-chunk-13](figure/unnamed-chunk-13-1.png)
 
 The variation between treatments is swamping the variation between replicates, so let's let the y-axis vary:
 
@@ -466,7 +435,7 @@ data_concentration |>
     )
 ```
 
-![plot of chunk unnamed-chunk-15](figure/unnamed-chunk-15-1.png)
+![plot of chunk unnamed-chunk-14](figure/unnamed-chunk-14-1.png)
 
 It looks like there is sometimes significantly more variation between technical replicates than PCR replicates.
 This suggests that we may want to use a hierarchical model of the error.
@@ -495,7 +464,7 @@ data_concentration |>
 ## `geom_smooth()` using method = 'loess' and formula = 'y ~ x'
 ```
 
-![plot of chunk unnamed-chunk-16](figure/unnamed-chunk-16-1.png)
+![plot of chunk unnamed-chunk-15](figure/unnamed-chunk-15-1.png)
 
 It's not really appropriate here since our data is non-linear, but we can also use a linear model:
 
@@ -512,7 +481,7 @@ data_concentration |>
 ## `geom_smooth()` using formula = 'y ~ x'
 ```
 
-![plot of chunk unnamed-chunk-17](figure/unnamed-chunk-17-1.png)
+![plot of chunk unnamed-chunk-16](figure/unnamed-chunk-16-1.png)
 
 
 ```r
@@ -573,7 +542,7 @@ data_collapsed |>
 ## `geom_smooth()` using method = 'loess' and formula = 'y ~ x'
 ```
 
-![plot of chunk unnamed-chunk-20](figure/unnamed-chunk-20-1.png)
+![plot of chunk unnamed-chunk-19](figure/unnamed-chunk-19-1.png)
 
 
 ```r
@@ -589,7 +558,7 @@ data_collapsed |>
 ## `geom_smooth()` using formula = 'y ~ x'
 ```
 
-![plot of chunk unnamed-chunk-21](figure/unnamed-chunk-21-1.png)
+![plot of chunk unnamed-chunk-20](figure/unnamed-chunk-20-1.png)
 
 We can fit linear models separately for each timepoint and examine the coefficients and standard errors:
 
@@ -632,7 +601,7 @@ models_all |>
   geom_point()
 ```
 
-![plot of chunk unnamed-chunk-23](figure/unnamed-chunk-23-1.png)
+![plot of chunk unnamed-chunk-22](figure/unnamed-chunk-22-1.png)
 
 # Redoing the standard curve
 
@@ -657,15 +626,6 @@ sample_name_pattern_standard_curve <- c(
 standard_curve_file <- paste(data_dir, "T1_QS2_018_BC49 and T1_QS2_018_BC04.xls", sep="")
 
 data_standard_curve <- read_qpcr_excel(standard_curve_file) |>
-  # TODO: package this into a function
-  transmute(
-    ct = as.numeric(CT),
-    sample_name = `Sample Name`,
-    well_position = `Well Position`,
-    ct_threshold = `Ct Threshold`,
-    auto_ct_threshold = `Automatic Ct Threshold`,
-    target_name = as.factor(`Target Name`)
-  ) |>
   separate_wider_regex(
     sample_name,
     patterns = sample_name_pattern_standard_curve,
@@ -687,18 +647,18 @@ kable(head(data_standard_curve, n = 10))
 
 
 
-|       ct|group | dilution|well_position | ct_threshold|auto_ct_threshold |target_name | log10_concentration|
-|--------:|:-----|--------:|:-------------|------------:|:-----------------|:-----------|-------------------:|
-|       NA|B2    |        1|E3            |          0.2|FALSE             |Barcode_2   |           0.9943612|
-| 36.90071|B2    |        2|E4            |          0.2|FALSE             |Barcode_2   |           1.9943612|
-| 31.61678|B2    |        3|E5            |          0.2|FALSE             |Barcode_2   |           2.9943612|
-| 28.23690|B2    |        4|E6            |          0.2|FALSE             |Barcode_2   |           3.9943612|
-| 26.06779|B2    |        5|E7            |          0.2|FALSE             |Barcode_2   |           4.9943612|
-| 22.05504|B2    |        6|E8            |          0.2|FALSE             |Barcode_2   |           5.9943612|
-| 17.27207|B2    |        7|E9            |          0.2|FALSE             |Barcode_2   |           6.9943612|
-|       NA|B2    |        1|F3            |          0.2|FALSE             |Barcode_2   |           0.9943612|
-| 36.73648|B2    |        2|F4            |          0.2|FALSE             |Barcode_2   |           1.9943612|
-| 31.35515|B2    |        3|F5            |          0.2|FALSE             |Barcode_2   |           2.9943612|
+|source_file                                  |       ct|group | dilution|well_position | ct_threshold|auto_ct_threshold |target_name | log10_concentration|
+|:--------------------------------------------|--------:|:-----|--------:|:-------------|------------:|:-----------------|:-----------|-------------------:|
+|data/T1_QS2_018_BC49 and T1_QS2_018_BC04.xls |       NA|B2    |        1|E3            |          0.2|FALSE             |Barcode_2   |           0.9943612|
+|data/T1_QS2_018_BC49 and T1_QS2_018_BC04.xls | 36.90071|B2    |        2|E4            |          0.2|FALSE             |Barcode_2   |           1.9943612|
+|data/T1_QS2_018_BC49 and T1_QS2_018_BC04.xls | 31.61678|B2    |        3|E5            |          0.2|FALSE             |Barcode_2   |           2.9943612|
+|data/T1_QS2_018_BC49 and T1_QS2_018_BC04.xls | 28.23690|B2    |        4|E6            |          0.2|FALSE             |Barcode_2   |           3.9943612|
+|data/T1_QS2_018_BC49 and T1_QS2_018_BC04.xls | 26.06779|B2    |        5|E7            |          0.2|FALSE             |Barcode_2   |           4.9943612|
+|data/T1_QS2_018_BC49 and T1_QS2_018_BC04.xls | 22.05504|B2    |        6|E8            |          0.2|FALSE             |Barcode_2   |           5.9943612|
+|data/T1_QS2_018_BC49 and T1_QS2_018_BC04.xls | 17.27207|B2    |        7|E9            |          0.2|FALSE             |Barcode_2   |           6.9943612|
+|data/T1_QS2_018_BC49 and T1_QS2_018_BC04.xls |       NA|B2    |        1|F3            |          0.2|FALSE             |Barcode_2   |           0.9943612|
+|data/T1_QS2_018_BC49 and T1_QS2_018_BC04.xls | 36.73648|B2    |        2|F4            |          0.2|FALSE             |Barcode_2   |           1.9943612|
+|data/T1_QS2_018_BC49 and T1_QS2_018_BC04.xls | 31.35515|B2    |        3|F5            |          0.2|FALSE             |Barcode_2   |           2.9943612|
 
 
 ```r
@@ -720,7 +680,7 @@ data_standard_curve |>
 ## Warning: Removed 4 rows containing missing values (`geom_point()`).
 ```
 
-![plot of chunk unnamed-chunk-25](figure/unnamed-chunk-25-1.png)
+![plot of chunk unnamed-chunk-24](figure/unnamed-chunk-24-1.png)
 The common deviations from linearity at each dilution suggests pipetting error in the dilution series in addition to qPCR variation.
 
 Fit linear model.
