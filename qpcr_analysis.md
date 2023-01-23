@@ -845,20 +845,63 @@ data_amp |>
     facet_wrap(
       facets = ~ plate,
     )
-```
 
-![plot of chunk unnamed-chunk-30](figure/unnamed-chunk-30-1.png)
-
-```r
 data_amp |>
     filter(target_name == "Phagemid") |>
     ggplot(mapping=aes(x=cycle, y=rn, group=well_position)) +
     geom_line() +
     facet_wrap(
-      facets = ~ plate,
+      f acets = ~ plate,
     )
 ```
 
-![plot of chunk unnamed-chunk-30](figure/unnamed-chunk-30-2.png)
+```
+## Error: <text>:14:9: unexpected symbol
+## 13:     facet_wrap(
+## 14:       f acets
+##             ^
+```
+
+There is one wastewater well that proports to show amplification, but it appears to be a baseline subtraction error as well:
+
+```r
+data_tidy |> filter(treatment_group == "wastewater", timepoint == 2) |> select(source_file, well_position, ct)
+```
+
+```
+## # A tibble: 9 × 3
+##   source_file                                        well_position    ct
+##   <chr>                                              <chr>         <dbl>
+## 1 data/11-day-qpcr/2023-01-21_degradation_plate1.xls H3             NA  
+## 2 data/11-day-qpcr/2023-01-21_degradation_plate1.xls H4             NA  
+## 3 data/11-day-qpcr/2023-01-21_degradation_plate1.xls H5             NA  
+## 4 data/11-day-qpcr/2023-01-21_degradation_plate1.xls H6             NA  
+## 5 data/11-day-qpcr/2023-01-21_degradation_plate1.xls H7             NA  
+## 6 data/11-day-qpcr/2023-01-21_degradation_plate1.xls H8             NA  
+## 7 data/11-day-qpcr/2023-01-21_degradation_plate1.xls H9             NA  
+## 8 data/11-day-qpcr/2023-01-21_degradation_plate1.xls H10            NA  
+## 9 data/11-day-qpcr/2023-01-21_degradation_plate1.xls H11            15.1
+```
+
+
+
+```r
+data_amp |>
+    filter(plate == "plate1", well_position == "H11") |>
+    ggplot(mapping=aes(x=cycle, y=delta_rn)) +
+    geom_line()
+```
+
+![plot of chunk unnamed-chunk-32](figure/unnamed-chunk-32-1.png)
+
+```r
+data_amp |>
+    filter(plate == "plate1", well_position == "H11") |>
+    ggplot(mapping=aes(x=cycle, y=rn)) +
+    geom_line()
+```
+
+![plot of chunk unnamed-chunk-32](figure/unnamed-chunk-32-2.png)
+
 
 # Hierarchical model with error propagation [TODO]

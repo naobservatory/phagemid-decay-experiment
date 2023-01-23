@@ -486,8 +486,26 @@ data_amp |>
     ggplot(mapping=aes(x=cycle, y=rn, group=well_position)) +
     geom_line() +
     facet_wrap(
-      facets = ~ plate,
+      f acets = ~ plate,
     )
 ```
+
+There is one wastewater well that proports to show amplification, but it appears to be a baseline subtraction error as well:
+```{r}
+data_tidy |> filter(treatment_group == "wastewater", timepoint == 2) |> select(source_file, well_position, ct)
+```
+
+```{r}
+data_amp |>
+    filter(plate == "plate1", well_position == "H11") |>
+    ggplot(mapping=aes(x=cycle, y=delta_rn)) +
+    geom_line()
+
+data_amp |>
+    filter(plate == "plate1", well_position == "H11") |>
+    ggplot(mapping=aes(x=cycle, y=rn)) +
+    geom_line()
+```
+
 
 # Hierarchical model with error propagation [TODO]
