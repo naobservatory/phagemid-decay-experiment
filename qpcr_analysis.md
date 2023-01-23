@@ -884,7 +884,6 @@ data_tidy |> filter(treatment_group == "wastewater", timepoint == 2) |> select(s
 ```
 
 
-
 ```r
 data_amp |>
     filter(plate == "plate1", well_position == "H11") |>
