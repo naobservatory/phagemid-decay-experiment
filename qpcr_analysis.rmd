@@ -13,8 +13,9 @@ library(knitr)
 # Ingest data
 
 The qPCR machine outputs its data in excel files.
-For this experiment, we can find the files [in our lab google drive](https://drive.google.com/drive/folders/1W7bcgLTdgLp2NX2_Yl3J17dTZ71Bi6Ib).
-Eventually, we might want to automate access to the data, but for now, we'll manually download Plates 1, 2, and 3 excel files and save to the `data/` directory.
+For this experiment, we can find the files [in our lab google drive](https://drive.google.com/drive/folders/1PntkFBFwNZfeXndBdq1k72ilLebwPbQd?usp=share_link).
+Eventually, we might want to automate access to the data, but for now, we'll manually download excel files and save to the `data/` directory.
+In this document, we'll be looking at the 11-day-qpcr experiment.
 
 ## Read qPCR data from excel files
 
@@ -57,8 +58,8 @@ read_qpcr_excel <- function(path) {
 TODO: It would be nice to specify what values to convert to `NA` quietly.
 
 ```{r}
-data_dir <- "data/"
-filename_pattern <- "Plate [0-9]+[.]xls"
+data_dir <- "data/11-day-qpcr"
+filename_pattern <- "2023-01-21_degradation_plate[0-9]+[.]xls"
 data_raw <- list.files(
   data_dir,
   pattern = filename_pattern,
@@ -90,30 +91,27 @@ We will use regular expressions to match the expected pattern, which is:
 1. The start of the string
 2. The treatment group, specified by one or more letters
 3. The timepoint, specified by one or more numbers
-4. A period
+4. A dash
 5. The technical replicate, specified by one or more numbers
 6. The end of the string
-
-In our input data, the non-template control was named "B1_NTC", which will break our naming scheme. We'll rename it to "NTC" first.
 
 Finally, we'll rename the single-letter treatment groups with more informative names and mark the negative controls so we can separate them out later.
 
 ```{r}
 coding = list(
-  "A" = "WW + phagemid",
-  "B" = "WW + phagemid + detergent",
+  "A" = "wastewater + phagemid",
+  "B" = "wastewater + phagemid + bleach",
   "C" = "TBS + phagemid",
-  "D" = "WW + phagemid + bleach",
-  "E" = "Just WW"
+  "D" = "wastewater"
 )
 
-controls <-  c("Blank", "NTC", "Just WW")
+controls <-  c("Blank", "NTC", "wastewater")
 
 sample_name_pattern = c(
   "^",
   treatment_group = "[A-Za-z]+",
   timepoint = "[0-9]+",
-  "\\.",
+  "\\-",
   tech_rep = "[0-9]+",
   "$"
 )
@@ -136,13 +134,15 @@ data_tidy <- data_raw |>
 kable(head(data_tidy, n = 10))
 ```
 
-Let's make sure we have 9 blanks and NTCs (3 per plate) and 36 of the other treatments (3 pcr replicates * 3 technical replicates * 4 timepoints).
+Let's make sure we have 24 blanks, 23 NTCs, 45 wastewater + phagemid and TBS + phagement (3 pcr replicates * 3 technical replicates * 5 timepoints), 63 bleach and wastewater (7 timepoints).
 ```{r}
 data_tidy |>
   group_by(treatment_group) |>
   count() |>
   kable()
 ```
+
+TODO: Relabel the missing wastewater wells.
 
 First, let's take a look at the Blanks and NTCs. These should mostly have `NA` for their ct value.
 ```{r}
@@ -163,6 +163,8 @@ data_tidy |>
   ggplot(mapping = aes(ct, treatment_group)) +
   geom_boxplot()
 ```
+
+TODO: Check on the Blanks
 
 # Convert raw Ct values to concentrations
 
@@ -185,7 +187,7 @@ In this case it's 0.9871 copies per microliter.
 In the future, we should probably include uncertainty in this value.
 
 ```{r}
-standard_curve_file <- paste(data_dir, "T1_QS2_018_BC49 and T1_QS2_018_BC04.xls", sep="")
+standard_curve_file <- paste("data/", "T1_QS2_018_BC49 and T1_QS2_018_BC04.xls", sep="")
 concentration_at_d0 <- 0.9871
 dilution_factor <- 10
 
@@ -288,27 +290,6 @@ data_concentration |>
     )
 ```
 
-The variation between treatments is swamping the variation between replicates, so let's let the y-axis vary:
-
-```{r}
-data_concentration |>
-  ggplot(aes(timepoint,log10_concentration, group = tech_rep)) +
-  stat_summary(
-    fun.min = min,
-    fun.max = max,
-    fun = median,
-    position = position_dodge(width = 0.2),
-    size = 0.2
-    ) +
-  facet_wrap(
-    facets = ~ treatment_group,
-    scales = "free_y"
-    )
-```
-
-It looks like there is sometimes significantly more variation between technical replicates than PCR replicates.
-This suggests that we may want to use a hierarchical model of the error.
-
 # Regression analysis
 
 In this section, we'll look at the trends in concentration over time.
@@ -328,7 +309,7 @@ data_concentration |>
   geom_smooth()
 ```
 
-It's not really appropriate here since our data is non-linear, but we can also use a linear model:
+We can also use a linear model:
 ```{r}
 data_concentration |>
   ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +

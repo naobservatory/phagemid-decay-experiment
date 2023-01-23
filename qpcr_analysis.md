@@ -14,8 +14,9 @@ library(knitr)
 # Ingest data
 
 The qPCR machine outputs its data in excel files.
-For this experiment, we can find the files [in our lab google drive](https://drive.google.com/drive/folders/1W7bcgLTdgLp2NX2_Yl3J17dTZ71Bi6Ib).
-Eventually, we might want to automate access to the data, but for now, we'll manually download Plates 1, 2, and 3 excel files and save to the `data/` directory.
+For this experiment, we can find the files [in our lab google drive](https://drive.google.com/drive/folders/1PntkFBFwNZfeXndBdq1k72ilLebwPbQd?usp=share_link).
+Eventually, we might want to automate access to the data, but for now, we'll manually download excel files and save to the `data/` directory.
+In this document, we'll be looking at the 11-day-qpcr experiment.
 
 ## Read qPCR data from excel files
 
@@ -60,8 +61,8 @@ TODO: It would be nice to specify what values to convert to `NA` quietly.
 
 
 ```r
-data_dir <- "data/"
-filename_pattern <- "Plate [0-9]+[.]xls"
+data_dir <- "data/11-day-qpcr"
+filename_pattern <- "2023-01-21_degradation_plate[0-9]+[.]xls"
 data_raw <- list.files(
   data_dir,
   pattern = filename_pattern,
@@ -85,18 +86,18 @@ kable(head(data_raw, n = 10))
 
 
 
-|source_file       |       ct|sample_name |well_position | ct_threshold|auto_ct_threshold |target_name   |
-|:-----------------|--------:|:-----------|:-------------|------------:|:-----------------|:-------------|
-|data//Plate 1.xls |       NA|Blank       |A1            |          0.2|FALSE             |Blank         |
-|data//Plate 1.xls |       NA|Blank       |A2            |          0.2|FALSE             |Blank         |
-|data//Plate 1.xls |       NA|Blank       |A3            |          0.2|FALSE             |Blank         |
-|data//Plate 1.xls | 35.92194|B1_NTC      |B1            |          0.2|FALSE             |Barcode_1_NTC |
-|data//Plate 1.xls |       NA|B1_NTC      |B2            |          0.2|FALSE             |Barcode_1_NTC |
-|data//Plate 1.xls | 36.77825|B1_NTC      |B3            |          0.2|FALSE             |Barcode_1_NTC |
-|data//Plate 1.xls | 20.32065|A0.1        |C1            |          0.2|FALSE             |Barcode_1     |
-|data//Plate 1.xls | 19.76434|A0.2        |C2            |          0.2|FALSE             |Barcode_1     |
-|data//Plate 1.xls | 18.81370|A0.3        |C3            |          0.2|FALSE             |Barcode_1     |
-|data//Plate 1.xls | 18.81602|A1.1        |C4            |          0.2|FALSE             |Barcode_1     |
+|source_file                                        |       ct|sample_name |well_position | ct_threshold|auto_ct_threshold |target_name |
+|:--------------------------------------------------|--------:|:-----------|:-------------|------------:|:-----------------|:-----------|
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |       NA|Blank       |A1            |          0.2|FALSE             |Blank       |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |       NA|NTC         |A2            |          0.2|FALSE             |NTC         |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.34180|A0-1        |A3            |          0.2|FALSE             |Phagemid    |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.29534|A0-1        |A4            |          0.2|FALSE             |Phagemid    |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.55094|A0-1        |A5            |          0.2|FALSE             |Phagemid    |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.35072|A0-2        |A6            |          0.2|FALSE             |Phagemid    |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.34296|A0-2        |A7            |          0.2|FALSE             |Phagemid    |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.40829|A0-2        |A8            |          0.2|FALSE             |Phagemid    |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.42208|A0-3        |A9            |          0.2|FALSE             |Phagemid    |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.30456|A0-3        |A10           |          0.2|FALSE             |Phagemid    |
 
 For quality control, let's check assertions our assertions about about `ct_threshold` and `autothreshold`.
 
@@ -127,31 +128,28 @@ We will use regular expressions to match the expected pattern, which is:
 1. The start of the string
 2. The treatment group, specified by one or more letters
 3. The timepoint, specified by one or more numbers
-4. A period
+4. A dash
 5. The technical replicate, specified by one or more numbers
 6. The end of the string
-
-In our input data, the non-template control was named "B1_NTC", which will break our naming scheme. We'll rename it to "NTC" first.
 
 Finally, we'll rename the single-letter treatment groups with more informative names and mark the negative controls so we can separate them out later.
 
 
 ```r
 coding = list(
-  "A" = "WW + phagemid",
-  "B" = "WW + phagemid + detergent",
+  "A" = "wastewater + phagemid",
+  "B" = "wastewater + phagemid + bleach",
   "C" = "TBS + phagemid",
-  "D" = "WW + phagemid + bleach",
-  "E" = "Just WW"
+  "D" = "wastewater"
 )
 
-controls <-  c("Blank", "NTC", "Just WW")
+controls <-  c("Blank", "NTC", "wastewater")
 
 sample_name_pattern = c(
   "^",
   treatment_group = "[A-Za-z]+",
   timepoint = "[0-9]+",
-  "\\.",
+  "\\-",
   tech_rep = "[0-9]+",
   "$"
 )
@@ -176,20 +174,20 @@ kable(head(data_tidy, n = 10))
 
 
 
-|source_file       |       ct|treatment_group | timepoint|tech_rep |well_position | ct_threshold|auto_ct_threshold |target_name   |control |
-|:-----------------|--------:|:---------------|---------:|:--------|:-------------|------------:|:-----------------|:-------------|:-------|
-|data//Plate 1.xls |       NA|Blank           |        NA|NA       |A1            |          0.2|FALSE             |Blank         |TRUE    |
-|data//Plate 1.xls |       NA|Blank           |        NA|NA       |A2            |          0.2|FALSE             |Blank         |TRUE    |
-|data//Plate 1.xls |       NA|Blank           |        NA|NA       |A3            |          0.2|FALSE             |Blank         |TRUE    |
-|data//Plate 1.xls | 35.92194|NTC             |        NA|NA       |B1            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
-|data//Plate 1.xls |       NA|NTC             |        NA|NA       |B2            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
-|data//Plate 1.xls | 36.77825|NTC             |        NA|NA       |B3            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
-|data//Plate 1.xls | 20.32065|WW + phagemid   |         0|1        |C1            |          0.2|FALSE             |Barcode_1     |FALSE   |
-|data//Plate 1.xls | 19.76434|WW + phagemid   |         0|2        |C2            |          0.2|FALSE             |Barcode_1     |FALSE   |
-|data//Plate 1.xls | 18.81370|WW + phagemid   |         0|3        |C3            |          0.2|FALSE             |Barcode_1     |FALSE   |
-|data//Plate 1.xls | 18.81602|WW + phagemid   |         1|1        |C4            |          0.2|FALSE             |Barcode_1     |FALSE   |
+|source_file                                        |       ct|treatment_group       | timepoint|tech_rep |well_position | ct_threshold|auto_ct_threshold |target_name |control |
+|:--------------------------------------------------|--------:|:---------------------|---------:|:--------|:-------------|------------:|:-----------------|:-----------|:-------|
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |       NA|Blank                 |        NA|NA       |A1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |       NA|NTC                   |        NA|NA       |A2            |          0.2|FALSE             |NTC         |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.34180|wastewater + phagemid |         0|1        |A3            |          0.2|FALSE             |Phagemid    |FALSE   |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.29534|wastewater + phagemid |         0|1        |A4            |          0.2|FALSE             |Phagemid    |FALSE   |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.55094|wastewater + phagemid |         0|1        |A5            |          0.2|FALSE             |Phagemid    |FALSE   |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.35072|wastewater + phagemid |         0|2        |A6            |          0.2|FALSE             |Phagemid    |FALSE   |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.34296|wastewater + phagemid |         0|2        |A7            |          0.2|FALSE             |Phagemid    |FALSE   |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.40829|wastewater + phagemid |         0|2        |A8            |          0.2|FALSE             |Phagemid    |FALSE   |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.42208|wastewater + phagemid |         0|3        |A9            |          0.2|FALSE             |Phagemid    |FALSE   |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.30456|wastewater + phagemid |         0|3        |A10           |          0.2|FALSE             |Phagemid    |FALSE   |
 
-Let's make sure we have 9 blanks and NTCs (3 per plate) and 36 of the other treatments (3 pcr replicates * 3 technical replicates * 4 timepoints).
+Let's make sure we have 24 blanks, 23 NTCs, 45 wastewater + phagemid and TBS + phagement (3 pcr replicates * 3 technical replicates * 5 timepoints), 63 bleach and wastewater (7 timepoints).
 
 ```r
 data_tidy |>
@@ -200,15 +198,16 @@ data_tidy |>
 
 
 
-|treatment_group           |  n|
-|:-------------------------|--:|
-|Blank                     |  9|
-|Just WW                   | 36|
-|NTC                       |  9|
-|TBS + phagemid            | 36|
-|WW + phagemid             | 36|
-|WW + phagemid + bleach    | 36|
-|WW + phagemid + detergent | 36|
+|treatment_group                |  n|
+|:------------------------------|--:|
+|Blank                          | 24|
+|NTC                            | 23|
+|TBS + phagemid                 | 45|
+|wastewater                     | 69|
+|wastewater + phagemid          | 45|
+|wastewater + phagemid + bleach | 63|
+
+TODO: Relabel the missing wastewater wells.
 
 First, let's take a look at the Blanks and NTCs. These should mostly have `NA` for their ct value.
 
@@ -220,26 +219,55 @@ data_tidy |>
 
 
 
-|source_file       |        ct|treatment_group | timepoint|tech_rep |well_position | ct_threshold|auto_ct_threshold |target_name   |control |
-|:-----------------|---------:|:---------------|---------:|:--------|:-------------|------------:|:-----------------|:-------------|:-------|
-|data//Plate 1.xls |        NA|Blank           |        NA|NA       |A1            |          0.2|FALSE             |Blank         |TRUE    |
-|data//Plate 1.xls |        NA|Blank           |        NA|NA       |A2            |          0.2|FALSE             |Blank         |TRUE    |
-|data//Plate 1.xls |        NA|Blank           |        NA|NA       |A3            |          0.2|FALSE             |Blank         |TRUE    |
-|data//Plate 1.xls | 35.921940|NTC             |        NA|NA       |B1            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
-|data//Plate 1.xls |        NA|NTC             |        NA|NA       |B2            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
-|data//Plate 1.xls | 36.778248|NTC             |        NA|NA       |B3            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
-|data//Plate 2.xls | 33.499622|Blank           |        NA|NA       |A1            |          0.2|FALSE             |Blank         |TRUE    |
-|data//Plate 2.xls |        NA|Blank           |        NA|NA       |A2            |          0.2|FALSE             |Blank         |TRUE    |
-|data//Plate 2.xls |  6.357395|Blank           |        NA|NA       |A3            |          0.2|FALSE             |Blank         |TRUE    |
-|data//Plate 2.xls |        NA|NTC             |        NA|NA       |B1            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
-|data//Plate 2.xls |        NA|NTC             |        NA|NA       |B2            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
-|data//Plate 2.xls |        NA|NTC             |        NA|NA       |B3            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
-|data//Plate 3.xls |        NA|Blank           |        NA|NA       |A1            |          0.2|FALSE             |Blank         |TRUE    |
-|data//Plate 3.xls |        NA|Blank           |        NA|NA       |A2            |          0.2|FALSE             |Blank         |TRUE    |
-|data//Plate 3.xls |        NA|Blank           |        NA|NA       |A3            |          0.2|FALSE             |Blank         |TRUE    |
-|data//Plate 3.xls | 39.660065|NTC             |        NA|NA       |B1            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
-|data//Plate 3.xls |        NA|NTC             |        NA|NA       |B2            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
-|data//Plate 3.xls | 37.288032|NTC             |        NA|NA       |B3            |          0.2|FALSE             |Barcode_1_NTC |TRUE    |
+|source_file                                        |        ct|treatment_group | timepoint|tech_rep |well_position | ct_threshold|auto_ct_threshold |target_name |control |
+|:--------------------------------------------------|---------:|:---------------|---------:|:--------|:-------------|------------:|:-----------------|:-----------|:-------|
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |        NA|Blank           |        NA|NA       |A1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |        NA|NTC             |        NA|NA       |A2            |          0.2|FALSE             |NTC         |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |        NA|Blank           |        NA|NA       |B1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |        NA|NTC             |        NA|NA       |B2            |          0.2|FALSE             |NTC         |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |  7.122666|Blank           |        NA|NA       |C1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |        NA|NTC             |        NA|NA       |C2            |          0.2|FALSE             |NTC         |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |  1.101108|Blank           |        NA|NA       |D1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |        NA|NTC             |        NA|NA       |D2            |          0.2|FALSE             |NTC         |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 37.704498|Blank           |        NA|NA       |E1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |        NA|NTC             |        NA|NA       |E2            |          0.2|FALSE             |NTC         |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |  8.145022|Blank           |        NA|NA       |F1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |        NA|NTC             |        NA|NA       |F2            |          0.2|FALSE             |NTC         |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 31.199942|Blank           |        NA|NA       |G1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 23.488712|Blank           |        NA|NA       |H1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |        NA|NTC             |        NA|NA       |H2            |          0.2|FALSE             |NTC         |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate2.xls | 16.789751|Blank           |        NA|NA       |A1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate2.xls |        NA|NTC             |        NA|NA       |A2            |          0.2|FALSE             |NTC         |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate2.xls | 18.323210|Blank           |        NA|NA       |B1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate2.xls |        NA|NTC             |        NA|NA       |B2            |          0.2|FALSE             |NTC         |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate2.xls |        NA|Blank           |        NA|NA       |C1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate2.xls |        NA|NTC             |        NA|NA       |C2            |          0.2|FALSE             |NTC         |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate2.xls | 35.004986|Blank           |        NA|NA       |D1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate2.xls |        NA|NTC             |        NA|NA       |D2            |          0.2|FALSE             |NTC         |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate2.xls | 36.372150|Blank           |        NA|NA       |E1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate2.xls |        NA|NTC             |        NA|NA       |E2            |          0.2|FALSE             |NTC         |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate2.xls | 25.604013|Blank           |        NA|NA       |F1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate2.xls |        NA|NTC             |        NA|NA       |F2            |          0.2|FALSE             |NTC         |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate2.xls |        NA|Blank           |        NA|NA       |G1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate2.xls |        NA|NTC             |        NA|NA       |G2            |          0.2|FALSE             |NTC         |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate2.xls |        NA|Blank           |        NA|NA       |H1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate2.xls |        NA|NTC             |        NA|NA       |H2            |          0.2|FALSE             |NTC         |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate3.xls | 13.887089|Blank           |        NA|NA       |A1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate3.xls |        NA|NTC             |        NA|NA       |A2            |          0.2|FALSE             |NTC         |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate3.xls | 18.587942|Blank           |        NA|NA       |B1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate3.xls |        NA|NTC             |        NA|NA       |B2            |          0.2|FALSE             |NTC         |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate3.xls | 15.852350|Blank           |        NA|NA       |C1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate3.xls |        NA|NTC             |        NA|NA       |C2            |          0.2|FALSE             |NTC         |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate3.xls | 28.758543|Blank           |        NA|NA       |D1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate3.xls |        NA|NTC             |        NA|NA       |D2            |          0.2|FALSE             |NTC         |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate3.xls |        NA|Blank           |        NA|NA       |E1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate3.xls |        NA|NTC             |        NA|NA       |E2            |          0.2|FALSE             |NTC         |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate3.xls |        NA|Blank           |        NA|NA       |F1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate3.xls |        NA|NTC             |        NA|NA       |F2            |          0.2|FALSE             |NTC         |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate3.xls | 13.545769|Blank           |        NA|NA       |G1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate3.xls |        NA|NTC             |        NA|NA       |G2            |          0.2|FALSE             |NTC         |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate3.xls | 35.200001|Blank           |        NA|NA       |H1            |          0.2|FALSE             |Blank       |TRUE    |
+|data/11-day-qpcr/2023-01-21_degradation_plate3.xls |        NA|NTC             |        NA|NA       |H2            |          0.2|FALSE             |NTC         |TRUE    |
 
 We can make a boxplot to compare the distribution of ct across treatments.
 To disply the NAs, we'll set them to one more than the maximum possible values.
@@ -256,6 +284,8 @@ data_tidy |>
 ```
 
 ![plot of chunk unnamed-chunk-8](figure/unnamed-chunk-8-1.png)
+
+TODO: Check on the Blanks
 
 # Convert raw Ct values to concentrations
 
@@ -279,7 +309,7 @@ In the future, we should probably include uncertainty in this value.
 
 
 ```r
-standard_curve_file <- paste(data_dir, "T1_QS2_018_BC49 and T1_QS2_018_BC04.xls", sep="")
+standard_curve_file <- paste("data/", "T1_QS2_018_BC49 and T1_QS2_018_BC04.xls", sep="")
 concentration_at_d0 <- 0.9871
 dilution_factor <- 10
 
@@ -400,18 +430,18 @@ kable(head(data_concentration, n = 10))
 
 
 
-|source_file       |       ct|treatment_group | timepoint|tech_rep |well_position | ct_threshold|auto_ct_threshold |target_name |control | log10_concentration|
-|:-----------------|--------:|:---------------|---------:|:--------|:-------------|------------:|:-----------------|:-----------|:-------|-------------------:|
-|data//Plate 1.xls | 20.32065|WW + phagemid   |         0|1        |C1            |          0.2|FALSE             |Barcode_1   |FALSE   |            6.283210|
-|data//Plate 1.xls | 19.76434|WW + phagemid   |         0|2        |C2            |          0.2|FALSE             |Barcode_1   |FALSE   |            6.434158|
-|data//Plate 1.xls | 18.81370|WW + phagemid   |         0|3        |C3            |          0.2|FALSE             |Barcode_1   |FALSE   |            6.692102|
-|data//Plate 1.xls | 18.81602|WW + phagemid   |         1|1        |C4            |          0.2|FALSE             |Barcode_1   |FALSE   |            6.691471|
-|data//Plate 1.xls | 19.44741|WW + phagemid   |         1|2        |C5            |          0.2|FALSE             |Barcode_1   |FALSE   |            6.520152|
-|data//Plate 1.xls | 19.54228|WW + phagemid   |         1|3        |C6            |          0.2|FALSE             |Barcode_1   |FALSE   |            6.494412|
-|data//Plate 1.xls | 18.98299|WW + phagemid   |         2|1        |C7            |          0.2|FALSE             |Barcode_1   |FALSE   |            6.646168|
-|data//Plate 1.xls | 18.98078|WW + phagemid   |         2|2        |C8            |          0.2|FALSE             |Barcode_1   |FALSE   |            6.646766|
-|data//Plate 1.xls | 19.66541|WW + phagemid   |         2|3        |C9            |          0.2|FALSE             |Barcode_1   |FALSE   |            6.461001|
-|data//Plate 1.xls | 20.02242|WW + phagemid   |         3|1        |C10           |          0.2|FALSE             |Barcode_1   |FALSE   |            6.364132|
+|source_file                                        |       ct|treatment_group                | timepoint|tech_rep |well_position | ct_threshold|auto_ct_threshold |target_name |control | log10_concentration|
+|:--------------------------------------------------|--------:|:------------------------------|---------:|:--------|:-------------|------------:|:-----------------|:-----------|:-------|-------------------:|
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.34180|wastewater + phagemid          |         0|1        |A3            |          0.2|FALSE             |Phagemid    |FALSE   |            6.820144|
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.29534|wastewater + phagemid          |         0|1        |A4            |          0.2|FALSE             |Phagemid    |FALSE   |            6.832752|
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.55094|wastewater + phagemid          |         0|1        |A5            |          0.2|FALSE             |Phagemid    |FALSE   |            6.763397|
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.35072|wastewater + phagemid          |         0|2        |A6            |          0.2|FALSE             |Phagemid    |FALSE   |            6.817725|
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.34296|wastewater + phagemid          |         0|2        |A7            |          0.2|FALSE             |Phagemid    |FALSE   |            6.819831|
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.40829|wastewater + phagemid          |         0|2        |A8            |          0.2|FALSE             |Phagemid    |FALSE   |            6.802104|
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.42208|wastewater + phagemid          |         0|3        |A9            |          0.2|FALSE             |Phagemid    |FALSE   |            6.798361|
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.30456|wastewater + phagemid          |         0|3        |A10           |          0.2|FALSE             |Phagemid    |FALSE   |            6.830250|
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.38781|wastewater + phagemid          |         0|3        |A11           |          0.2|FALSE             |Phagemid    |FALSE   |            6.807662|
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls | 18.67497|wastewater + phagemid + bleach |         0|1        |B3            |          0.2|FALSE             |Phagemid    |FALSE   |            6.729744|
 
 Since we have three PCR replicates per technical replicate, we can summarize our data with min, median, and max without any loss of information.
 
@@ -430,56 +460,59 @@ data_concentration |>
 
 
 
-|treatment_group           | timepoint|tech_rep | conc_min| conc_med| conc_max|
-|:-------------------------|---------:|:--------|--------:|--------:|--------:|
-|TBS + phagemid            |         0|1        | 6.768629| 6.831939| 6.850767|
-|TBS + phagemid            |         0|2        | 6.792594| 6.838014| 6.873845|
-|TBS + phagemid            |         0|3        | 6.685091| 6.888193| 6.901456|
-|TBS + phagemid            |         1|1        | 6.847414| 6.850799| 6.868806|
-|TBS + phagemid            |         1|2        | 6.861752| 6.877301| 6.901897|
-|TBS + phagemid            |         1|3        | 6.847557| 6.853574| 6.869579|
-|TBS + phagemid            |         2|1        | 6.788273| 6.803791| 6.811155|
-|TBS + phagemid            |         2|2        | 6.839764| 6.845615| 6.872852|
-|TBS + phagemid            |         2|3        | 6.838165| 6.838324| 6.846268|
-|TBS + phagemid            |         3|1        | 6.719253| 6.735894| 6.743167|
-|TBS + phagemid            |         3|2        | 6.727330| 6.733523| 6.760886|
-|TBS + phagemid            |         3|3        | 6.682990| 6.705391| 6.709441|
-|WW + phagemid             |         0|1        | 6.283210| 6.314316| 6.323252|
-|WW + phagemid             |         0|2        | 6.386303| 6.406878| 6.434158|
-|WW + phagemid             |         0|3        | 6.523524| 6.671040| 6.692102|
-|WW + phagemid             |         1|1        | 6.651537| 6.684856| 6.691471|
-|WW + phagemid             |         1|2        | 6.520152| 6.568075| 6.598458|
-|WW + phagemid             |         1|3        | 6.494412| 6.505401| 6.558010|
-|WW + phagemid             |         2|1        | 6.611078| 6.615849| 6.646168|
-|WW + phagemid             |         2|2        | 6.594384| 6.646766| 6.657950|
-|WW + phagemid             |         2|3        | 6.459501| 6.461001| 6.491916|
-|WW + phagemid             |         3|1        | 6.354589| 6.363023| 6.364132|
-|WW + phagemid             |         3|2        | 6.402674| 6.406696| 6.427756|
-|WW + phagemid             |         3|3        | 6.533144| 6.557411| 6.558043|
-|WW + phagemid + bleach    |         0|1        | 4.787649| 4.800018| 4.822280|
-|WW + phagemid + bleach    |         0|2        | 4.699068| 4.711782| 4.803886|
-|WW + phagemid + bleach    |         0|3        | 4.641530| 4.839236| 4.869814|
-|WW + phagemid + bleach    |         1|1        | 3.120599| 3.140413| 3.146569|
-|WW + phagemid + bleach    |         1|2        | 3.147737| 3.160051| 3.182787|
-|WW + phagemid + bleach    |         1|3        | 3.422276| 3.494283| 3.521149|
-|WW + phagemid + bleach    |         2|1        | 3.097206| 3.135306| 3.164729|
-|WW + phagemid + bleach    |         2|2        | 3.374704| 3.393190| 3.401506|
-|WW + phagemid + bleach    |         2|3        | 3.322457| 3.332269| 3.405885|
-|WW + phagemid + bleach    |         3|1        | 3.213055| 3.281083| 3.388138|
-|WW + phagemid + bleach    |         3|2        | 2.670246| 3.001971| 3.080543|
-|WW + phagemid + bleach    |         3|3        | 3.373322| 3.426183| 3.436552|
-|WW + phagemid + detergent |         0|1        | 6.380370| 6.387304| 6.394484|
-|WW + phagemid + detergent |         0|2        | 6.487330| 6.506259| 6.508774|
-|WW + phagemid + detergent |         0|3        | 6.353817| 6.415591| 6.464465|
-|WW + phagemid + detergent |         1|1        | 6.280246| 6.300750| 6.310677|
-|WW + phagemid + detergent |         1|2        | 6.267446| 6.308108| 6.327672|
-|WW + phagemid + detergent |         1|3        | 6.243128| 6.404803| 6.442681|
-|WW + phagemid + detergent |         2|1        | 6.273809| 6.300213| 6.303632|
-|WW + phagemid + detergent |         2|2        | 6.253504| 6.314915| 6.339672|
-|WW + phagemid + detergent |         2|3        | 6.440447| 6.464878| 6.490252|
-|WW + phagemid + detergent |         3|1        | 5.816943| 5.828693| 5.853964|
-|WW + phagemid + detergent |         3|2        | 5.866659| 5.878833| 5.933811|
-|WW + phagemid + detergent |         3|3        | 5.231239| 5.287751| 5.290213|
+|treatment_group                | timepoint|tech_rep | conc_min| conc_med| conc_max|
+|:------------------------------|---------:|:--------|--------:|--------:|--------:|
+|TBS + phagemid                 |         0|1        | 6.848491| 6.874437| 6.890585|
+|TBS + phagemid                 |         0|2        | 6.690239| 6.696246| 6.727786|
+|TBS + phagemid                 |         0|3        | 6.836330| 6.845710| 6.866186|
+|TBS + phagemid                 |         3|1        | 6.821579| 6.832730| 6.850520|
+|TBS + phagemid                 |         3|2        | 6.921391| 6.936402| 6.959049|
+|TBS + phagemid                 |         3|3        | 6.881070| 6.912953| 6.936426|
+|TBS + phagemid                 |         4|1        | 6.697814| 6.701416| 6.723007|
+|TBS + phagemid                 |         4|2        | 6.697952| 6.744917| 6.747592|
+|TBS + phagemid                 |         4|3        | 6.831916| 6.872476| 6.911891|
+|TBS + phagemid                 |         8|1        | 6.820742| 6.851124| 6.875485|
+|TBS + phagemid                 |         8|2        | 6.768991| 6.776604| 6.793206|
+|TBS + phagemid                 |         8|3        | 6.676517| 6.699110| 6.725580|
+|TBS + phagemid                 |        11|1        | 6.624997| 6.630496| 6.641820|
+|TBS + phagemid                 |        11|2        | 6.592235| 6.656606| 6.666144|
+|TBS + phagemid                 |        11|3        | 6.661934| 6.677105| 6.682441|
+|wastewater + phagemid          |         0|1        | 6.763397| 6.820144| 6.832752|
+|wastewater + phagemid          |         0|2        | 6.802104| 6.817725| 6.819831|
+|wastewater + phagemid          |         0|3        | 6.798361| 6.807662| 6.830250|
+|wastewater + phagemid          |         3|1        | 6.685651| 6.712316| 6.753321|
+|wastewater + phagemid          |         3|2        | 6.618200| 6.635098| 6.670514|
+|wastewater + phagemid          |         3|3        | 6.675817| 6.720248| 6.735693|
+|wastewater + phagemid          |         4|1        | 6.610231| 6.665555| 6.699638|
+|wastewater + phagemid          |         4|2        | 6.616483| 6.656540| 6.657536|
+|wastewater + phagemid          |         4|3        | 6.687298| 6.726550| 6.743163|
+|wastewater + phagemid          |         8|1        | 6.467016| 6.560424| 6.571577|
+|wastewater + phagemid          |         8|2        | 6.498120| 6.508134| 6.529151|
+|wastewater + phagemid          |         8|3        | 6.348102| 6.386062| 6.403592|
+|wastewater + phagemid          |        11|1        | 6.480610| 6.529886| 6.557219|
+|wastewater + phagemid          |        11|2        | 6.593274| 6.593362| 6.593814|
+|wastewater + phagemid          |        11|3        | 6.583409| 6.617205| 6.634971|
+|wastewater + phagemid + bleach |         0|1        | 6.729744| 6.746106| 6.781763|
+|wastewater + phagemid + bleach |         0|2        | 6.730216| 6.739548| 6.756291|
+|wastewater + phagemid + bleach |         0|3        | 6.749397| 6.763163| 6.767459|
+|wastewater + phagemid + bleach |         1|1        | 6.616427| 6.708162| 6.714910|
+|wastewater + phagemid + bleach |         1|2        | 6.587873| 6.625963| 6.631138|
+|wastewater + phagemid + bleach |         1|3        | 6.700366| 6.705834| 6.707775|
+|wastewater + phagemid + bleach |         2|1        | 6.655631| 6.673966| 6.718287|
+|wastewater + phagemid + bleach |         2|2        | 6.514317| 6.583239| 6.660965|
+|wastewater + phagemid + bleach |         2|3        | 6.645268| 6.699751| 6.721067|
+|wastewater + phagemid + bleach |         3|1        | 6.665023| 6.686003| 6.744820|
+|wastewater + phagemid + bleach |         3|2        | 6.652584| 6.659688| 6.692501|
+|wastewater + phagemid + bleach |         3|3        | 6.668292| 6.668701| 6.810810|
+|wastewater + phagemid + bleach |         4|1        | 6.539586| 6.542637| 6.572873|
+|wastewater + phagemid + bleach |         4|2        | 6.703937| 6.790166| 6.794634|
+|wastewater + phagemid + bleach |         4|3        | 6.598908| 6.628981| 6.656334|
+|wastewater + phagemid + bleach |         8|1        | 6.614022| 6.625182| 6.703118|
+|wastewater + phagemid + bleach |         8|2        | 6.494957| 6.498736| 6.510038|
+|wastewater + phagemid + bleach |         8|3        | 6.425300| 6.427169| 6.448430|
+|wastewater + phagemid + bleach |        11|1        | 6.397518| 6.403579| 6.404978|
+|wastewater + phagemid + bleach |        11|2        | 6.289515| 6.320439| 6.357832|
+|wastewater + phagemid + bleach |        11|3        | 6.403920| 6.432470| 6.440736|
 
 # Plot log concentrations vs time for each condition
 
@@ -518,30 +551,6 @@ data_concentration |>
 
 ![plot of chunk unnamed-chunk-15](figure/unnamed-chunk-15-1.png)
 
-The variation between treatments is swamping the variation between replicates, so let's let the y-axis vary:
-
-
-```r
-data_concentration |>
-  ggplot(aes(timepoint,log10_concentration, group = tech_rep)) +
-  stat_summary(
-    fun.min = min,
-    fun.max = max,
-    fun = median,
-    position = position_dodge(width = 0.2),
-    size = 0.2
-    ) +
-  facet_wrap(
-    facets = ~ treatment_group,
-    scales = "free_y"
-    )
-```
-
-![plot of chunk unnamed-chunk-16](figure/unnamed-chunk-16-1.png)
-
-It looks like there is sometimes significantly more variation between technical replicates than PCR replicates.
-This suggests that we may want to use a hierarchical model of the error.
-
 # Regression analysis
 
 In this section, we'll look at the trends in concentration over time.
@@ -566,7 +575,7 @@ data_concentration |>
 ## `geom_smooth()` using method = 'loess' and formula = 'y ~ x'
 ```
 
-![plot of chunk unnamed-chunk-17](figure/unnamed-chunk-17-1.png)
+![plot of chunk unnamed-chunk-16](figure/unnamed-chunk-16-1.png)
 
 It's not really appropriate here since our data is non-linear, but we can also use a linear model:
 
@@ -583,7 +592,7 @@ data_concentration |>
 ## `geom_smooth()` using formula = 'y ~ x'
 ```
 
-![plot of chunk unnamed-chunk-18](figure/unnamed-chunk-18-1.png)
+![plot of chunk unnamed-chunk-17](figure/unnamed-chunk-17-1.png)
 
 
 ```r
@@ -608,16 +617,14 @@ kable(models)
 
 
 
-|collapsed |treatment_group           |term        |   estimate| std.error|   statistic|   p.value|
-|:---------|:-------------------------|:-----------|----------:|---------:|-----------:|---------:|
-|FALSE     |WW + phagemid             |(Intercept) |  6.5175850| 0.0340313| 191.5171920| 0.0000000|
-|FALSE     |WW + phagemid             |timepoint   | -0.0032190| 0.0181905|  -0.1769585| 0.8605909|
-|FALSE     |WW + phagemid + detergent |(Intercept) |  6.5337324| 0.0663000|  98.5479440| 0.0000000|
-|FALSE     |WW + phagemid + detergent |timepoint   | -0.2270561| 0.0354389|  -6.4069822| 0.0000003|
-|FALSE     |WW + phagemid + bleach    |(Intercept) |  4.3339485| 0.1243744|  34.8459951| 0.0000000|
-|FALSE     |WW + phagemid + bleach    |timepoint   | -0.4669014| 0.0664809|  -7.0230909| 0.0000000|
-|FALSE     |TBS + phagemid            |(Intercept) |  6.8619652| 0.0148943| 460.7097711| 0.0000000|
-|FALSE     |TBS + phagemid            |timepoint   | -0.0336937| 0.0079614|  -4.2321566| 0.0001657|
+|collapsed |treatment_group                |term        |   estimate| std.error|  statistic|  p.value|
+|:---------|:------------------------------|:-----------|----------:|---------:|----------:|--------:|
+|FALSE     |wastewater + phagemid          |(Intercept) |  6.7747858| 0.0193852| 349.482634| 0.00e+00|
+|FALSE     |wastewater + phagemid          |timepoint   | -0.0249887| 0.0029912|  -8.354077| 0.00e+00|
+|FALSE     |wastewater + phagemid + bleach |(Intercept) |  6.7411412| 0.0136427| 494.122350| 0.00e+00|
+|FALSE     |wastewater + phagemid + bleach |timepoint   | -0.0298194| 0.0024617| -12.113503| 0.00e+00|
+|FALSE     |TBS + phagemid                 |(Intercept) |  6.8603451| 0.0204201| 335.960076| 0.00e+00|
+|FALSE     |TBS + phagemid                 |timepoint   | -0.0155439| 0.0031509|  -4.933183| 1.26e-05|
 
 ## Collapsing qPCR replicates
 
@@ -644,7 +651,7 @@ data_collapsed |>
 ## `geom_smooth()` using method = 'loess' and formula = 'y ~ x'
 ```
 
-![plot of chunk unnamed-chunk-21](figure/unnamed-chunk-21-1.png)
+![plot of chunk unnamed-chunk-20](figure/unnamed-chunk-20-1.png)
 
 
 ```r
@@ -660,7 +667,7 @@ data_collapsed |>
 ## `geom_smooth()` using formula = 'y ~ x'
 ```
 
-![plot of chunk unnamed-chunk-22](figure/unnamed-chunk-22-1.png)
+![plot of chunk unnamed-chunk-21](figure/unnamed-chunk-21-1.png)
 
 We can fit linear models separately for each timepoint and examine the coefficients and standard errors:
 
@@ -674,24 +681,20 @@ kable(models_all)
 
 
 
-|collapsed |treatment_group           |term        |   estimate| std.error|   statistic|   p.value|
-|:---------|:-------------------------|:-----------|----------:|---------:|-----------:|---------:|
-|FALSE     |WW + phagemid             |(Intercept) |  6.5175850| 0.0340313| 191.5171920| 0.0000000|
-|FALSE     |WW + phagemid             |timepoint   | -0.0032190| 0.0181905|  -0.1769585| 0.8605909|
-|FALSE     |WW + phagemid + detergent |(Intercept) |  6.5337324| 0.0663000|  98.5479440| 0.0000000|
-|FALSE     |WW + phagemid + detergent |timepoint   | -0.2270561| 0.0354389|  -6.4069822| 0.0000003|
-|FALSE     |WW + phagemid + bleach    |(Intercept) |  4.3339485| 0.1243744|  34.8459951| 0.0000000|
-|FALSE     |WW + phagemid + bleach    |timepoint   | -0.4669014| 0.0664809|  -7.0230909| 0.0000000|
-|FALSE     |TBS + phagemid            |(Intercept) |  6.8619652| 0.0148943| 460.7097711| 0.0000000|
-|FALSE     |TBS + phagemid            |timepoint   | -0.0336937| 0.0079614|  -4.2321566| 0.0001657|
-|TRUE      |TBS + phagemid            |(Intercept) |  6.8619652| 0.0210402| 326.1366660| 0.0000000|
-|TRUE      |TBS + phagemid            |timepoint   | -0.0336937| 0.0112464|  -2.9959457| 0.0134364|
-|TRUE      |WW + phagemid             |(Intercept) |  6.5175850| 0.0608776| 107.0604957| 0.0000000|
-|TRUE      |WW + phagemid             |timepoint   | -0.0032190| 0.0325404|  -0.0989220| 0.9231551|
-|TRUE      |WW + phagemid + bleach    |(Intercept) |  4.3339485| 0.2265427|  19.1308196| 0.0000000|
-|TRUE      |WW + phagemid + bleach    |timepoint   | -0.4669014| 0.1210922|  -3.8557511| 0.0031822|
-|TRUE      |WW + phagemid + detergent |(Intercept) |  6.5337324| 0.1208895|  54.0471506| 0.0000000|
-|TRUE      |WW + phagemid + detergent |timepoint   | -0.2270561| 0.0646181|  -3.5138139| 0.0055959|
+|collapsed |treatment_group                |term        |   estimate| std.error|  statistic|   p.value|
+|:---------|:------------------------------|:-----------|----------:|---------:|----------:|---------:|
+|FALSE     |wastewater + phagemid          |(Intercept) |  6.7747858| 0.0193852| 349.482634| 0.0000000|
+|FALSE     |wastewater + phagemid          |timepoint   | -0.0249887| 0.0029912|  -8.354077| 0.0000000|
+|FALSE     |wastewater + phagemid + bleach |(Intercept) |  6.7411412| 0.0136427| 494.122350| 0.0000000|
+|FALSE     |wastewater + phagemid + bleach |timepoint   | -0.0298194| 0.0024617| -12.113503| 0.0000000|
+|FALSE     |TBS + phagemid                 |(Intercept) |  6.8603451| 0.0204201| 335.960076| 0.0000000|
+|FALSE     |TBS + phagemid                 |timepoint   | -0.0155439| 0.0031509|  -4.933183| 0.0000126|
+|TRUE      |TBS + phagemid                 |(Intercept) |  6.8603451| 0.0360482| 190.310215| 0.0000000|
+|TRUE      |TBS + phagemid                 |timepoint   | -0.0155439| 0.0055624|  -2.794484| 0.0151892|
+|TRUE      |wastewater + phagemid          |(Intercept) |  6.7747858| 0.0332204| 203.934392| 0.0000000|
+|TRUE      |wastewater + phagemid          |timepoint   | -0.0249887| 0.0051260|  -4.874874| 0.0003034|
+|TRUE      |wastewater + phagemid + bleach |(Intercept) |  6.7411412| 0.0220541| 305.663907| 0.0000000|
+|TRUE      |wastewater + phagemid + bleach |timepoint   | -0.0298194| 0.0039794|  -7.493409| 0.0000004|
 
 Collapsing the qPCR replicates increases the standard error of the regression coefficients:
 
@@ -703,6 +706,6 @@ models_all |>
   geom_point()
 ```
 
-![plot of chunk unnamed-chunk-24](figure/unnamed-chunk-24-1.png)
+![plot of chunk unnamed-chunk-23](figure/unnamed-chunk-23-1.png)
 
 # Hierarchical model with error propagation [TODO]
