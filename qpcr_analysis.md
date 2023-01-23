@@ -269,10 +269,11 @@ data_tidy |>
 |data/11-day-qpcr/2023-01-21_degradation_plate3.xls | 35.200001|Blank           |        NA|NA       |H1            |          0.2|FALSE             |Blank       |TRUE    |
 |data/11-day-qpcr/2023-01-21_degradation_plate3.xls |        NA|NTC             |        NA|NA       |H2            |          0.2|FALSE             |NTC         |TRUE    |
 
+Note that many of the Blanks have low CT values.
+TODO: investigate these by looking at the raw data.
+
 We can make a boxplot to compare the distribution of ct across treatments.
 To disply the NAs, we'll set them to one more than the maximum possible values.
-We see that the Blanks, NTCs, and Just WW have CT > 35, with a few outliers.
-We'll probably want to check those at some point.
 
 
 ```r
@@ -285,7 +286,8 @@ data_tidy |>
 
 ![plot of chunk unnamed-chunk-8](figure/unnamed-chunk-8-1.png)
 
-TODO: Check on the Blanks
+We see that the wastewater and NTC have high CT values, mostly NA, as expected.
+Again we see that the Blanks have lower than expected CT, which we should investigate.
 
 # Convert raw Ct values to concentrations
 
@@ -577,7 +579,7 @@ data_concentration |>
 
 ![plot of chunk unnamed-chunk-16](figure/unnamed-chunk-16-1.png)
 
-It's not really appropriate here since our data is non-linear, but we can also use a linear model:
+The Loess is clearly overfitting to the noise between timepoints. We can also use a linear model:
 
 ```r
 data_concentration |>

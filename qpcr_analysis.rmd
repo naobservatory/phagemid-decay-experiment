@@ -151,10 +151,11 @@ data_tidy |>
   kable()
 ```
 
+Note that many of the Blanks have low CT values.
+TODO: investigate these by looking at the raw data.
+
 We can make a boxplot to compare the distribution of ct across treatments.
 To disply the NAs, we'll set them to one more than the maximum possible values.
-We see that the Blanks, NTCs, and Just WW have CT > 35, with a few outliers.
-We'll probably want to check those at some point.
 
 ```{r}
 ct_max <- max(data_tidy$ct, na.rm = TRUE) + 1
@@ -164,7 +165,8 @@ data_tidy |>
   geom_boxplot()
 ```
 
-TODO: Check on the Blanks
+We see that the wastewater and NTC have high CT values, mostly NA, as expected.
+Again we see that the Blanks have lower than expected CT, which we should investigate.
 
 # Convert raw Ct values to concentrations
 
@@ -309,7 +311,7 @@ data_concentration |>
   geom_smooth()
 ```
 
-We can also use a linear model:
+The Loess is clearly overfitting to the noise between timepoints. We can also use a linear model:
 ```{r}
 data_concentration |>
   ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
