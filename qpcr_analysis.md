@@ -710,4 +710,37 @@ models_all |>
 
 ![plot of chunk unnamed-chunk-23](figure/unnamed-chunk-23-1.png)
 
+## Simple summary plot for EHS
+
+Reduce clutter by summarizing each timepoint as mean +- stdev of all nine measurements.
+
+
+```r
+breaks  <- c(2, 3, 4, 5, 6, 7, 8, 9) * 1e6
+data_concentration |>
+  ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
+  stat_summary(
+    fun.data = "mean_sdl",
+    fun.args = list(mult = 1),
+    position = position_dodge(width = 0.5),
+    size = 0.25,
+  ) +
+  geom_smooth(
+    method = "lm",
+    se = FALSE,
+  ) +
+  labs(
+       x="Day",
+       y="Concentration (copies/uL)",
+       color="Treatment",
+       ) +
+  scale_y_continuous(breaks=log10(breaks), labels=breaks)
+```
+
+```
+## `geom_smooth()` using formula = 'y ~ x'
+```
+
+![plot of chunk unnamed-chunk-24](figure/unnamed-chunk-24-1.png)
+
 # Hierarchical model with error propagation [TODO]
