@@ -743,4 +743,122 @@ data_concentration |>
 
 ![plot of chunk unnamed-chunk-24](figure/unnamed-chunk-24-1.png)
 
+# Investigating the blanks
+
+
+```r
+read_qpcr_amplification_excel <- function(path) {
+  read_excel(
+    path = path,
+    sheet = "Amplification Data",
+    skip = 42
+  ) |>
+  transmute(
+    source_file = path,
+    well_position = `Well Position`,
+    cycle = `Cycle`,
+    target_name = `Target Name`,
+    rn = `Rn`,
+    delta_rn = `Delta Rn`,
+  )
+}
+```
+
+
+```r
+data_amp <- list.files(
+  data_dir,
+  pattern = filename_pattern,
+  full.names = TRUE
+  ) |>
+  map(read_qpcr_amplification_excel) |>
+  list_rbind() |>
+  mutate(plate = str_extract(source_file, "plate[1-9]+"))
+kable(head(data_amp, n = 10))
+```
+
+
+
+|source_file                                        |well_position | cycle|target_name |       rn|   delta_rn|plate  |
+|:--------------------------------------------------|:-------------|-----:|:-----------|--------:|----------:|:------|
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |A1            |     1|Blank       | 3.212152|  0.0465057|plate1 |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |A1            |     2|Blank       | 3.204999|  0.0329796|plate1 |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |A1            |     3|Blank       | 3.188220|  0.0098271|plate1 |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |A1            |     4|Blank       | 3.190290|  0.0055242|plate1 |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |A1            |     5|Blank       | 3.197421|  0.0062820|plate1 |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |A1            |     6|Blank       | 3.199462|  0.0019500|plate1 |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |A1            |     7|Blank       | 3.191881| -0.0120051|plate1 |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |A1            |     8|Blank       | 3.198851| -0.0114080|plate1 |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |A1            |     9|Blank       | 3.209879| -0.0067532|plate1 |
+|data/11-day-qpcr/2023-01-21_degradation_plate1.xls |A1            |    10|Blank       | 3.214007| -0.0089984|plate1 |
+
+
+```r
+data_amp |> count(target_name)
+```
+
+```
+## # A tibble: 4 × 2
+##   target_name     n
+##   <chr>       <int>
+## 1 Blank         960
+## 2 NTC           920
+## 3 Phagemid     8880
+## 4 <NA>          760
+```
+
+Plot delta rn for each blank:
+
+```r
+data_amp |>
+    filter(target_name == "Blank") |>
+    ggplot(mapping=aes(x=cycle, y=delta_rn, color=well_position)) +
+    geom_line() +
+    facet_wrap(
+      facets = ~ plate,
+    )
+```
+
+![plot of chunk unnamed-chunk-28](figure/unnamed-chunk-28-1.png)
+
+These linear trends could be due to baseline subtraction. Plot raw Rn:
+
+```r
+data_amp |>
+    filter(target_name == "Blank") |>
+    ggplot(mapping=aes(x=cycle, y=rn, color=well_position)) +
+    geom_line() +
+    facet_wrap(
+      facets = ~ plate,
+    )
+```
+
+![plot of chunk unnamed-chunk-29](figure/unnamed-chunk-29-1.png)
+
+For comparison, here are the plots for the phagemid samples:
+
+```r
+data_amp |>
+    filter(target_name == "Phagemid") |>
+    ggplot(mapping=aes(x=cycle, y=delta_rn, group=well_position)) +
+    geom_line() +
+    facet_wrap(
+      facets = ~ plate,
+    )
+```
+
+![plot of chunk unnamed-chunk-30](figure/unnamed-chunk-30-1.png)
+
+```r
+data_amp |>
+    filter(target_name == "Phagemid") |>
+    ggplot(mapping=aes(x=cycle, y=rn, group=well_position)) +
+    geom_line() +
+    facet_wrap(
+      facets = ~ plate,
+    )
+```
+
+![plot of chunk unnamed-chunk-30](figure/unnamed-chunk-30-2.png)
+
 # Hierarchical model with error propagation [TODO]

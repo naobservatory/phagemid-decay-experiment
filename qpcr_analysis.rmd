@@ -413,4 +413,81 @@ data_concentration |>
   scale_y_continuous(breaks=log10(breaks), labels=breaks)
 ```
 
+# Investigating the blanks
+
+```{r}
+read_qpcr_amplification_excel <- function(path) {
+  read_excel(
+    path = path,
+    sheet = "Amplification Data",
+    skip = 42
+  ) |>
+  transmute(
+    source_file = path,
+    well_position = `Well Position`,
+    cycle = `Cycle`,
+    target_name = `Target Name`,
+    rn = `Rn`,
+    delta_rn = `Delta Rn`,
+  )
+}
+```
+
+```{r}
+data_amp <- list.files(
+  data_dir,
+  pattern = filename_pattern,
+  full.names = TRUE
+  ) |>
+  map(read_qpcr_amplification_excel) |>
+  list_rbind() |>
+  mutate(plate = str_extract(source_file, "plate[1-9]+"))
+kable(head(data_amp, n = 10))
+```
+
+```{r}
+data_amp |> count(target_name)
+```
+
+Plot delta rn for each blank:
+```{r}
+data_amp |>
+    filter(target_name == "Blank") |>
+    ggplot(mapping=aes(x=cycle, y=delta_rn, color=well_position)) +
+    geom_line() +
+    facet_wrap(
+      facets = ~ plate,
+    )
+```
+
+These linear trends could be due to baseline subtraction. Plot raw Rn:
+```{r}
+data_amp |>
+    filter(target_name == "Blank") |>
+    ggplot(mapping=aes(x=cycle, y=rn, color=well_position)) +
+    geom_line() +
+    facet_wrap(
+      facets = ~ plate,
+    )
+```
+
+For comparison, here are the plots for the phagemid samples:
+```{r}
+data_amp |>
+    filter(target_name == "Phagemid") |>
+    ggplot(mapping=aes(x=cycle, y=delta_rn, group=well_position)) +
+    geom_line() +
+    facet_wrap(
+      facets = ~ plate,
+    )
+
+data_amp |>
+    filter(target_name == "Phagemid") |>
+    ggplot(mapping=aes(x=cycle, y=rn, group=well_position)) +
+    geom_line() +
+    facet_wrap(
+      facets = ~ plate,
+    )
+```
+
 # Hierarchical model with error propagation [TODO]
