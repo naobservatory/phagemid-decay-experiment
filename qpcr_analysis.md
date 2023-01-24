@@ -11,6 +11,12 @@ library(broom)
 library(knitr)
 ```
 
+
+```r
+theme_set(cowplot::theme_cowplot())
+```
+
+
 # Ingest data
 
 The qPCR machine outputs its data in excel files.
@@ -284,7 +290,7 @@ data_tidy |>
   geom_boxplot()
 ```
 
-![plot of chunk unnamed-chunk-8](figure/unnamed-chunk-8-1.png)
+![plot of chunk unnamed-chunk-9](figure/unnamed-chunk-9-1.png)
 
 We see that the wastewater and NTC have high CT values, mostly NA, as expected.
 Again we see that the Blanks have lower than expected CT, which we should investigate.
@@ -378,7 +384,7 @@ data_standard_curve |>
 ## Warning: Removed 4 rows containing missing values (`geom_point()`).
 ```
 
-![plot of chunk unnamed-chunk-10](figure/unnamed-chunk-10-1.png)
+![plot of chunk unnamed-chunk-11](figure/unnamed-chunk-11-1.png)
 The common deviations from linearity at each dilution suggests pipetting error in the dilution series in addition to qPCR variation.
 
 Fit a linear model and save the coefficients.
@@ -531,7 +537,7 @@ data_concentration |>
   )
 ```
 
-![plot of chunk unnamed-chunk-14](figure/unnamed-chunk-14-1.png)
+![plot of chunk unnamed-chunk-15](figure/unnamed-chunk-15-1.png)
 
 Let's look at within- vs between-technical replicate variation:
 
@@ -551,7 +557,7 @@ data_concentration |>
     )
 ```
 
-![plot of chunk unnamed-chunk-15](figure/unnamed-chunk-15-1.png)
+![plot of chunk unnamed-chunk-16](figure/unnamed-chunk-16-1.png)
 
 # Regression analysis
 
@@ -577,7 +583,7 @@ data_concentration |>
 ## `geom_smooth()` using method = 'loess' and formula = 'y ~ x'
 ```
 
-![plot of chunk unnamed-chunk-16](figure/unnamed-chunk-16-1.png)
+![plot of chunk unnamed-chunk-17](figure/unnamed-chunk-17-1.png)
 
 The Loess is clearly overfitting to the noise between timepoints. We can also use a linear model:
 
@@ -594,7 +600,7 @@ data_concentration |>
 ## `geom_smooth()` using formula = 'y ~ x'
 ```
 
-![plot of chunk unnamed-chunk-17](figure/unnamed-chunk-17-1.png)
+![plot of chunk unnamed-chunk-18](figure/unnamed-chunk-18-1.png)
 
 
 ```r
@@ -653,7 +659,7 @@ data_collapsed |>
 ## `geom_smooth()` using method = 'loess' and formula = 'y ~ x'
 ```
 
-![plot of chunk unnamed-chunk-20](figure/unnamed-chunk-20-1.png)
+![plot of chunk unnamed-chunk-21](figure/unnamed-chunk-21-1.png)
 
 
 ```r
@@ -669,7 +675,7 @@ data_collapsed |>
 ## `geom_smooth()` using formula = 'y ~ x'
 ```
 
-![plot of chunk unnamed-chunk-21](figure/unnamed-chunk-21-1.png)
+![plot of chunk unnamed-chunk-22](figure/unnamed-chunk-22-1.png)
 
 We can fit linear models separately for each timepoint and examine the coefficients and standard errors:
 
@@ -708,7 +714,7 @@ models_all |>
   geom_point()
 ```
 
-![plot of chunk unnamed-chunk-23](figure/unnamed-chunk-23-1.png)
+![plot of chunk unnamed-chunk-24](figure/unnamed-chunk-24-1.png)
 
 ## Simple summary plot for EHS
 
@@ -734,14 +740,15 @@ data_concentration |>
        y="Concentration (copies/uL)",
        color="Treatment",
        ) +
-  scale_y_continuous(breaks=log10(breaks), labels=breaks)
+  scale_y_continuous(breaks=log10(breaks), labels=breaks) +
+  scale_color_brewer(type = "qual", palette = 3)
 ```
 
 ```
 ## `geom_smooth()` using formula = 'y ~ x'
 ```
 
-![plot of chunk unnamed-chunk-24](figure/unnamed-chunk-24-1.png)
+![plot of chunk unnamed-chunk-25](figure/unnamed-chunk-25-1.png)
 
 # Investigating the blanks
 
@@ -819,7 +826,7 @@ data_amp |>
     )
 ```
 
-![plot of chunk unnamed-chunk-28](figure/unnamed-chunk-28-1.png)
+![plot of chunk unnamed-chunk-29](figure/unnamed-chunk-29-1.png)
 
 These linear trends could be due to baseline subtraction. Plot raw Rn:
 
@@ -833,7 +840,7 @@ data_amp |>
     )
 ```
 
-![plot of chunk unnamed-chunk-29](figure/unnamed-chunk-29-1.png)
+![plot of chunk unnamed-chunk-30](figure/unnamed-chunk-30-1.png)
 
 For comparison, here are the plots for the phagemid samples:
 
@@ -842,25 +849,20 @@ data_amp |>
     filter(target_name == "Phagemid") |>
     ggplot(mapping=aes(x=cycle, y=delta_rn, group=well_position)) +
     geom_line() +
-    facet_wrap(
-      facets = ~ plate,
-    )
+    facet_wrap(facets = ~ plate)
+```
 
+![plot of chunk unnamed-chunk-31](figure/unnamed-chunk-31-1.png)
+
+```r
 data_amp |>
     filter(target_name == "Phagemid") |>
     ggplot(mapping=aes(x=cycle, y=rn, group=well_position)) +
     geom_line() +
-    facet_wrap(
-      f acets = ~ plate,
-    )
+    facet_wrap(facets = ~ plate)
 ```
 
-```
-## Error: <text>:14:9: unexpected symbol
-## 13:     facet_wrap(
-## 14:       f acets
-##             ^
-```
+![plot of chunk unnamed-chunk-31](figure/unnamed-chunk-31-2.png)
 
 There is one wastewater well that proports to show amplification, but it appears to be a baseline subtraction error as well:
 
@@ -891,7 +893,7 @@ data_amp |>
     geom_line()
 ```
 
-![plot of chunk unnamed-chunk-32](figure/unnamed-chunk-32-1.png)
+![plot of chunk unnamed-chunk-33](figure/unnamed-chunk-33-1.png)
 
 ```r
 data_amp |>
@@ -900,7 +902,7 @@ data_amp |>
     geom_line()
 ```
 
-![plot of chunk unnamed-chunk-32](figure/unnamed-chunk-32-2.png)
+![plot of chunk unnamed-chunk-33](figure/unnamed-chunk-33-2.png)
 
 
 # Hierarchical model with error propagation [TODO]

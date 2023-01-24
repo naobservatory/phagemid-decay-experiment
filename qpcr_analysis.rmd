@@ -10,6 +10,11 @@ library(broom)
 library(knitr)
 ```
 
+```{r}
+theme_set(cowplot::theme_cowplot())
+```
+
+
 # Ingest data
 
 The qPCR machine outputs its data in excel files.
@@ -410,7 +415,8 @@ data_concentration |>
        y="Concentration (copies/uL)",
        color="Treatment",
        ) +
-  scale_y_continuous(breaks=log10(breaks), labels=breaks)
+  scale_y_continuous(breaks=log10(breaks), labels=breaks) +
+  scale_color_brewer(type = "qual", palette = 3)
 ```
 
 # Investigating the blanks
@@ -477,17 +483,13 @@ data_amp |>
     filter(target_name == "Phagemid") |>
     ggplot(mapping=aes(x=cycle, y=delta_rn, group=well_position)) +
     geom_line() +
-    facet_wrap(
-      facets = ~ plate,
-    )
+    facet_wrap(facets = ~ plate)
 
 data_amp |>
     filter(target_name == "Phagemid") |>
     ggplot(mapping=aes(x=cycle, y=rn, group=well_position)) +
     geom_line() +
-    facet_wrap(
-      f acets = ~ plate,
-    )
+    facet_wrap(facets = ~ plate)
 ```
 
 There is one wastewater well that proports to show amplification, but it appears to be a baseline subtraction error as well:
