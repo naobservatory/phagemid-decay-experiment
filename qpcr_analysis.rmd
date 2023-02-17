@@ -63,8 +63,8 @@ read_qpcr_excel <- function(path) {
 TODO: It would be nice to specify what values to convert to `NA` quietly.
 
 ```{r}
-data_dir <- "data/11-day-qpcr"
-filename_pattern <- "2023-01-21_degradation_plate[0-9]+[.]xls"
+data_dir <- "data/37-day-qpcr"
+filename_pattern <- "3-7 [0-9]+[.]xls"
 data_raw <- list.files(
   data_dir,
   pattern = filename_pattern,
@@ -397,7 +397,7 @@ models_all |>
 Reduce clutter by summarizing each timepoint as mean +- stdev of all nine measurements.
 
 ```{r, fig.width=10, fig.height=5}
-breaks  <- c(2, 3, 4, 5, 6, 7, 8, 9) * 1e6
+breaks  <- c(100, 10, 1) * 1e5
 data_concentration |>
   ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
   stat_summary(
@@ -447,7 +447,7 @@ data_amp <- list.files(
   ) |>
   map(read_qpcr_amplification_excel) |>
   list_rbind() |>
-  mutate(plate = str_extract(source_file, "plate[1-9]+"))
+  mutate(plate = str_extract(source_file, "3-7 [1-9]+"))
 kable(head(data_amp, n = 10))
 ```
 
@@ -486,28 +486,10 @@ data_amp |>
     facet_wrap(facets = ~ plate)
 
 data_amp |>
-    filter(target_name == "Phagemid") |>
+    filter(target_name == "18") |>
     ggplot(mapping=aes(x=cycle, y=rn, group=well_position)) +
     geom_line() +
     facet_wrap(facets = ~ plate)
 ```
-
-There is one wastewater well that proports to show amplification, but it appears to be a baseline subtraction error as well:
-```{r}
-data_tidy |> filter(treatment_group == "wastewater", timepoint == 2) |> select(source_file, well_position, ct)
-```
-
-```{r}
-data_amp |>
-    filter(plate == "plate1", well_position == "H11") |>
-    ggplot(mapping=aes(x=cycle, y=delta_rn)) +
-    geom_line()
-
-data_amp |>
-    filter(plate == "plate1", well_position == "H11") |>
-    ggplot(mapping=aes(x=cycle, y=rn)) +
-    geom_line()
-```
-
 
 # Hierarchical model with error propagation [TODO]

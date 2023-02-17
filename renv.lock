@@ -1075,7 +1075,7 @@
       "RemoteRef": "main",
       "RemoteSha": "21818c67a4837fa2878cc4fb27408064da928264",
       "Remotes": "tidyverse/stringr",
-      "Hash": "a2e45607dfe1e5f70c37d2a07579b5c7",
+      "Hash": "fad86f739c5fcb61fb441d125297f349",
       "Requirements": [
         "cli",
         "cpp11",
