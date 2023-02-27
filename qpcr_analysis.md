@@ -648,7 +648,7 @@ data_collapsed |>
 
 ![plot of chunk unnamed-chunk-22](figure/unnamed-chunk-22-1.png)
 
-We can fit linear models separately for each timepoint and examine the coefficients and standard errors:
+We can fit linear models separately for each treatment group and examine the coefficients and standard errors:
 
 
 ```r
