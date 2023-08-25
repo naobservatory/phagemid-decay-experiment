@@ -1,0 +1,580 @@
+---
+title: "qPCR analysis of degredation experiment"
+---
+
+```{r}
+library(tidyverse)
+library(here)
+library(fs)
+library(readxl)
+library(broom)
+library(knitr)
+
+# plotting libraries
+library(cowplot)
+library(patchwork)
+library(ggbeeswarm)
+```
+
+```{r}
+theme_set(cowplot::theme_cowplot())
+```
+
+
+# Ingest data
+
+The qPCR machine outputs its data in excel files.
+For this experiment, we can find the files [in our lab google drive](https://drive.google.com/drive/folders/1PntkFBFwNZfeXndBdq1k72ilLebwPbQd?usp=share_link).
+Eventually, we might want to automate access to the data, but for now, we'll manually download excel files and save to the `data/` directory.
+In this document, we'll be looking at the 11-day-qpcr experiment.
+
+## Read qPCR data from excel files
+
+For each plate, we'll read the "Results" sheet.
+The first 42 rows of the sheet are metadata that we don't need, so we'll skip them.
+We'll also save the path in a column called "source_file" so we can look for plate effects if we'd like after we merge files.
+
+We're only going to keep a subset of columns.
+In the next block we extract the columns we want and convert them to the correct datatypes.
+
+* `CT`: the Ct value. Either "Undetermined" or a number. We'll use `as.numeric` to convert from a character string to a number (double).
+* `Sample Name` labels the content of the samples
+* `Well Position` is the alphanumeric plate well ID (e.g., "A01"). Note: this is redundant with `Sample Name` here, but in the future we may want to automatically label the samples from `Well Position` using a plate layout file.
+* `Ct Threshold`. These should all be `0.2`. We will check that for quality control.
+* `Automatic Ct Threshold`. These should all be `FALSE`
+* `Target Name` can be used to distinguish experimental samples ("Barcode_1") from blanks ("Blank") and NTCs ("Barcode_1_NTC"). We'll encode these as factors because they have a limited set of values.
+
+We'll also rename the columns consistently in "snake case" (i.e., all lowercase with underscores separating the words.)
+
+In the future we may want to redo the baseline subtraction manually, but for now, we'll ignore those columns.
+
+```{r}
+read_qpcr_excel <- function(path) {
+  read_excel(
+    path = path,
+    sheet = "Results",
+    skip = 42
+  ) |>
+  transmute(
+    source_file = path,
+    ct = as.numeric(CT),
+    sample_name = `Sample Name`,
+    well = `Well Position`,
+    ct_threshold = `Ct Threshold`,
+    auto_ct_threshold = `Automatic Ct Threshold`,
+    target_name = as.factor(`Target Name`)
+  )
+}
+```
+TODO: It would be nice to specify what values to convert to `NA` quietly.
+
+```{r}
+data_dir <- here("data/37-day-qpcr")
+filename_pattern <- "3-7 [0-9]+[.]xls"
+data_raw <- list.files(
+  data_dir,
+  pattern = filename_pattern,
+  full.names = TRUE
+  ) |>
+  map(read_qpcr_excel) |>
+  list_rbind() %>%
+  mutate(
+    source_file = path_rel(source_file, data_dir)
+  )
+data_raw %>%
+  head(n = 10) %>%
+  kable()
+```
+
+For quality control, let's check assertions our assertions about about `ct_threshold` and `autothreshold`.
+
+```{r}
+expected_ct_threshold <- 0.2
+data_raw |>
+  summarize(
+    all_auto_ct_theshold_false = all(!auto_ct_threshold),
+    all_ct_theshold_expected = all(ct_threshold == expected_ct_threshold)
+  )
+```
+
+## Tidy the data
+
+```{r}
+data_raw %>% pull(sample_name)
+```
+
+
+Currently we have the `sample_name` column, which contains three pieces of information: the experimental condition (e.g., "A", "B", ...), the timepoint, and the technical replicate number.
+To make the data tidier, we'll split this into separate columns.
+
+We will use regular expressions to match the expected pattern, which is:
+
+1. The start of the string
+2. The treatment group, specified by one or more letters
+3. The timepoint, specified by one or more numbers
+4. A period
+5. The technical replicate, specified by one or more numbers
+6. The end of the string
+
+Finally, we'll rename the single-letter treatment groups with more informative names and mark the negative controls so we can separate them out later.
+
+```{r}
+coding = list(
+  "A" = "wastewater + phagemid",
+  "B" = "wastewater + phagemid + bleach",
+  "C" = "TBS + phagemid",
+  "D" = "wastewater"
+)
+
+controls <-  c("Blank", "NTC", "wastewater")
+
+sample_name_pattern = c(
+  "^",
+  treatment_group = "[A-Za-z]+",
+  timepoint = "[0-9]+",
+  "\\.",
+  tech_rep = "[0-9]+",
+  "$"
+)
+
+data_tidy <- data_raw |>
+  mutate(
+    sample_name = str_replace(sample_name, "B1_NTC", "NTC")
+  ) |>
+  separate_wider_regex(
+    sample_name,
+    patterns = sample_name_pattern,
+    too_few = "align_start",
+    cols_remove = FALSE
+  ) |>
+  mutate(
+    treatment_group = recode(treatment_group, !!!coding),
+    control = treatment_group %in% controls,
+    timepoint = as.integer(timepoint),
+    tech_rep = as.factor(tech_rep),
+    # simplify source file by removing path up to data_path
+    plate = str_extract(source_file, "3-7 [1-9]+"),
+    plate_well = str_c(plate, well, sep = '_')
+  )
+kable(head(data_tidy, n = 10))
+```
+
+Let's make sure we have 24 blanks, 23 NTCs, 45 wastewater + phagemid and TBS + phagemid (3 qPCR replicates * 3 technical replicates * 5 timepoints), 63 bleach and wastewater (7 timepoints).
+
+```{r}
+data_tidy |>
+  group_by(treatment_group) |>
+  count() |>
+  kable()
+```
+
+TODO: Relabel the missing wastewater wells.
+
+First, let's take a look at the Blanks and NTCs. These should mostly have `NA` for their ct value.
+
+```{r}
+data_tidy |>
+  filter(treatment_group == "Blank" | treatment_group == "NTC") |>
+  kable()
+```
+
+Note that many of the Blanks have low CT values.
+TODO: investigate these by looking at the raw data.
+
+We can make a boxplot to compare the distribution of ct across treatments.
+To disply the NAs, we'll set them to one more than the maximum possible values.
+
+```{r}
+ct_max <- max(data_tidy$ct, na.rm = TRUE) + 1
+data_tidy |>
+  mutate(ct = replace_na(ct, ct_max)) |>
+  ggplot(mapping = aes(ct, treatment_group)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_quasirandom(alpha = 0.4)
+```
+
+We see that the wastewater and NTC have high CT values, mostly NA, as expected.
+Again we see that the Blanks have lower than expected CT.
+These are investigated below and shown to be artefacts of baseline subtraction; thus they can be ignored.
+
+# Convert raw Ct values to concentrations
+
+We would like to transform our `c_t` values to concentrations (or more specifically log concentrations).
+We expect `c_t` to depend on log concentration according to the linear relationship $c_t = a \log(\text{conc}) + b$.
+To estimate the coefficients $a$ and $b$, we use a *standard curve*, a series of qPCR measurements on sequentially diluted samples.
+Note that we expect these coefficients to be phagemid-specific, so we will need to do a standard curve for each phagemid.
+
+## Make the standard curve
+
+Ari did a single dilution series with 10x dilution at each step and three qPCR measurements of each dilution.
+First, we'll read the excel file produced by the qPCR machine.
+We want barcode 18-04, which is "B2" in the file.
+
+The samples in this file are labeled by their level of dilution.
+We convert this label to log10 concentration.
+In Ari's coding, dilution $d$ is 10x more concentrated than dilution $d-1$.
+We also need to know the expected concentration at $d=0$.
+In this case it's 0.9871 copies per microliter.
+In the future, we should probably include uncertainty in this value.
+
+```{r}
+standard_curve_file <- here("data", "T1_QS2_018_BC49 and T1_QS2_018_BC04.xls")
+concentration_at_d0 <- 0.9871
+dilution_factor <- 10
+
+sample_name_pattern_standard_curve <- c(
+  "^",
+  group = "[A-Za-z0-9]+",
+  "_D",
+  dilution = "[0-9]+",
+  "$"
+)
+
+data_standard_curve <- read_qpcr_excel(standard_curve_file) |>
+  separate_wider_regex(
+    sample_name,
+    patterns = sample_name_pattern_standard_curve,
+    too_few = "align_start"
+  ) |>
+  mutate(dilution = as.integer(dilution)) |>
+  filter(group == "B2") |>
+  drop_na(dilution) |>
+  mutate(log10_concentration = log10(concentration_at_d0) + log10(dilution_factor) * dilution)
+
+kable(head(data_standard_curve, n = 10))
+
+```
+
+```{r}
+data_standard_curve |>
+  ggplot(mapping = aes(log10_concentration, ct)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+```
+
+The common deviations from linearity at each dilution suggests pipetting error in the dilution series in addition to qPCR variation.
+
+Fit a linear model and save the coefficients.
+
+```{r}
+standard_curve <- lm(ct ~ log10_concentration, data_standard_curve)
+summary(standard_curve)
+
+std_curve_slope  <- standard_curve$coefficients["log10_concentration"]
+std_curve_intercept  <- standard_curve$coefficients["(Intercept)"]
+```
+
+Note: a correct model would take into account that errors in dilution propagate to all future dilutions.
+
+## Apply standard curve
+
+Now we can apply the standard curve to our data.
+We're also going to filter out the negative controls from now on.
+
+```{r}
+data_concentration <- data_tidy |>
+  filter(!control) |>
+  mutate(log10_concentration = (ct - std_curve_intercept) / std_curve_slope)
+kable(head(data_concentration, n = 10))
+```
+
+Since we have three PCR replicates per technical replicate, we can summarize our data with min, median, and max without any loss of information.
+
+```{r}
+data_concentration |>
+  group_by(treatment_group, timepoint, tech_rep) |>
+  summarize(
+    conc_min = min(log10_concentration, na.rm = TRUE),
+    conc_med = median(log10_concentration, na.rm = TRUE),
+    conc_max = max(log10_concentration, na.rm = TRUE),
+    .groups="drop"
+  ) |>
+  kable()
+```
+
+# Plot log concentrations vs time for each condition
+
+First, we plot all the treatment groups on the same timecourse to see differences in absolute as well as relative concentration.
+
+```{r}
+data_concentration |>
+  ggplot(
+    aes(timepoint, log10_concentration, shape = treatment_group, color = treatment_group)
+    ) +
+  geom_point(
+    position = position_jitter(height = 0, width = 0.1, seed = 3579237)
+  )
+```
+
+Let's look at within- vs between-technical replicate variation:
+
+```{r}
+data_concentration |>
+  ggplot(aes(timepoint,log10_concentration, group = tech_rep)) +
+  stat_summary(
+    fun.min = min,
+    fun.max = max,
+    fun = median,
+    position = position_dodge(width = 0.2),
+    size = 0.2
+    ) +
+  facet_wrap(
+    facets = ~ treatment_group,
+    )
+```
+
+# Regression analysis
+
+In this section, we'll look at the trends in concentration over time.
+First, we'll make the approximation that all of the qPCR measurements for a `(treatment_group, timepoint)` pair are independent.
+This is not exactly true because the qPCR replicates of the same technical replicate share the noise of the technical replicate.
+Thus, the error bars on these estimates will be too optimistic.
+Next, we'll make the opposite approximation: that the mean of the qPCR replicates is a single observation.
+In the future, we'll look at a hierarchical model that incorporates the dependency structure of the measurements.
+
+## Treating all observations as independent
+
+We can use a Loess curve to see the trend for each treatment:
+
+```{r, warning=FALSE}
+data_concentration |>
+  ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
+  geom_point() +
+  geom_smooth()
+```
+
+The Loess is clearly overfitting to the noise between timepoints. We can also use a linear model:
+
+```{r}
+data_concentration |>
+  ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
+  geom_point() +
+  geom_smooth(
+    method = "lm"
+  )
+```
+
+```{r}
+# TODO: Make this function more generic
+fit_lm_by_treatment <- function(data){
+  treatments <- unique(data$treatment_group)
+  treatments |>
+    map(~ filter(data, treatment_group == .)) |>
+    map(~ lm(log10_concentration ~ timepoint, .)) |>
+    map(tidy) |>
+    map2(
+      treatments,
+      ~ mutate(.x, treatment_group=.y, .before=1)
+      ) |>
+    list_rbind()
+}
+
+models <- fit_lm_by_treatment(data_concentration) |>
+    mutate(collapsed=FALSE, .before=1)
+kable(models)
+```
+
+## Collapsing qPCR replicates
+
+Now, we create a new table that collapses the qPCR replicates:
+
+```{r}
+data_collapsed <- data_concentration |>
+  group_by(treatment_group, timepoint, tech_rep) |>
+  summarise(log10_concentration = mean(log10_concentration), .groups="drop")
+```
+
+With the collapse, we have wider error bars on our linear estimates.
+Just as the independent approximation meant that the errors were too optimistic, this approximation is too conservative.
+
+```{r warning=FALSE}
+data_collapsed |>
+  ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
+  geom_point() +
+  geom_smooth()
+```
+
+```{r}
+data_collapsed |>
+  ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
+  geom_point() +
+  geom_smooth(
+    method = "lm"
+  )
+```
+
+We can fit linear models separately for each timepoint and examine the coefficients and standard errors:
+
+```{r}
+models_collapsed <- fit_lm_by_treatment(data_collapsed) |>
+    mutate(collapsed=TRUE, .before=1)
+models_all <- rbind(models, models_collapsed)
+kable(models_all)
+```
+
+Collapsing the qPCR replicates increases the standard error of the regression coefficients:
+
+```{r}
+models_all |>
+  filter(term == "timepoint") |>
+  ggplot(aes(collapsed, std.error, group=treatment_group)) +
+  geom_line(aes(linetype = treatment_group)) +
+  geom_point()
+```
+
+## Simple summary plot for EHS
+
+Reduce clutter by summarizing each timepoint as mean +- stdev of all nine measurements.
+
+```{r, fig.width=10, fig.height=5}
+breaks  <- c(100, 10, 1) * 1e5
+data_concentration |>
+  ggplot(aes(timepoint, log10_concentration, color=treatment_group)) +
+  stat_summary(
+    fun.data = "mean_sdl",
+    fun.args = list(mult = 1),
+    position = position_dodge(width = 0.5),
+    size = 0.25,
+  ) +
+  geom_smooth(
+    method = "lm",
+    se = FALSE,
+  ) +
+  labs(
+       x="Day",
+       y="Concentration (copies/uL)",
+       color="Treatment",
+       ) +
+  scale_y_continuous(breaks=log10(breaks), labels=breaks) +
+  scale_color_brewer(type = "qual", palette = 3)
+```
+
+## Plot and summary stats for manuscript
+
+There is a lot of variation around the overall trend, from different sources
+
+- day-to-day variation
+- variation among technical replicates
+- variation among qPCR replicates
+
+We want a plot that shows this variation, so that we can understand the limits of what can really be said here.
+To do so, it is important to plot the individual replicates as separate datapoints.
+I'll summarize the qPCR replicates on the plot by putting a point at the median (middle of the three qPCR replicates) and bars to the min and max qPCR replicates.
+
+```{r, fig.width=6, fig.height=4}
+breaks  <- c(100, 10, 1) * 1e5
+data_concentration |>
+  filter(
+    treatment_group %in% c('TBS + phagemid', 'wastewater + phagemid')
+  ) |>
+  ggplot(
+    aes(timepoint, log10_concentration, color=treatment_group, 
+      shape = treatment_group)
+  ) +
+#  geom_smooth(
+#    method = "lm",
+#    se = FALSE,
+#    size = 0.5
+#  ) +
+  stat_summary(
+    aes(group = sample_name),
+    fun.data = "median_hilow",
+    position = position_dodge(width = 0.5),
+    size = 0.4,
+  ) +
+  labs(
+       x="Day",
+       y="Concentration (copies/uL)",
+       color="Treatment",
+       shape="Treatment",
+       ) +
+  scale_y_continuous(breaks=log10(breaks), labels=breaks) +
+  scale_shape_manual(values = c(1, 19)) +
+  scale_color_brewer(type = "qual", palette = 1) +
+  theme(legend.position = 'top')
+```
+
+```{r, eval = F}
+ggsave('manuscript-figure.png', dpi = 300, width = 6, height = 4.5, units = 'in')
+```
+
+The variability suggests standard linear regression is not appropriate.
+Instead, let's just show the data as is and avoid making quantitative estimates of half life.
+
+
+# Investigating the blanks
+
+```{r}
+read_qpcr_amplification_excel <- function(path) {
+  read_excel(
+    path = path,
+    sheet = "Amplification Data",
+    skip = 42
+  ) |>
+  transmute(
+    source_file = path,
+    well_position = `Well Position`,
+    cycle = `Cycle`,
+    target_name = `Target Name`,
+    rn = `Rn`,
+    delta_rn = `Delta Rn`,
+  )
+}
+```
+
+```{r}
+data_amp <- list.files(
+  data_dir,
+  pattern = filename_pattern,
+  full.names = TRUE
+  ) |>
+  map(read_qpcr_amplification_excel) |>
+  list_rbind() |>
+  mutate(plate = str_extract(source_file, "3-7 [1-9]+"))
+kable(head(data_amp, n = 10))
+```
+
+```{r}
+data_amp |> count(target_name)
+```
+
+Plot delta rn for each blank:
+```{r}
+data_amp |>
+    filter(target_name == "Blank") |>
+    ggplot(mapping=aes(x=cycle, y=delta_rn, color=well_position)) +
+    geom_line() +
+    facet_wrap(
+      facets = ~ plate,
+    )
+```
+
+These linear trends could be due to baseline subtraction. Plot raw Rn:
+```{r}
+data_amp |>
+    filter(target_name == "Blank") |>
+    ggplot(mapping=aes(x=cycle, y=rn, color=well_position)) +
+    geom_line() +
+    facet_wrap(
+      facets = ~ plate,
+    )
+```
+
+For comparison, here are the plots for the phagemid samples:
+```{r}
+p1 <- data_amp |>
+    filter(target_name == "18") |>
+    ggplot(mapping=aes(x=cycle, y=delta_rn, group=well_position)) +
+    geom_line() +
+    facet_wrap(facets = ~ plate)
+
+p2 <- data_amp |>
+    filter(target_name == "18") |>
+    ggplot(mapping=aes(x=cycle, y=rn, group=well_position)) +
+    geom_line() +
+    facet_wrap(facets = ~ plate)
+
+p1 / p2
+```
+
+# Hierarchical model with error propagation [TODO]
