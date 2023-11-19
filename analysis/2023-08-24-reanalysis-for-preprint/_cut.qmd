@@ -1,0 +1,35 @@
+
+### statistical inference of decay
+
+- use a statistical model to estimate how much decay has occurred by day 37
+
+ 
+```{r}
+library(rstanarm)
+options(mc.cores = parallel::detectCores())
+
+library(ggdist)
+```
+
+
+```{r}
+x <- data_concentration |>
+  filter(
+    # treatment_group %in% c('TBS + phagemid', 'wastewater + phagemid')
+    treatment_group %in% c('wastewater + phagemid'),
+  )
+```
+
+```{r}
+stan_fit <- stan_glm(
+  log10_concentration ~ timepoint + sample_name + plate_well,
+  data = x
+)
+stan_fit %>% summary
+```
+
+doesn't converge with default priors, probably because of how crazy the data looks.
+probably not a good idea to try to fit this.
+
+TODO: fix metadata so that timepoint is time in days
+

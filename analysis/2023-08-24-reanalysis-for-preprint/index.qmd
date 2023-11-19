@@ -1,5 +1,8 @@
 ---
-title: "qPCR analysis of degredation experiment"
+title: "qPCR analysis of stability (degradation) experiment"
+author: 
+  - Michael McLaren
+  - Daniel Rice
 ---
 
 ```{r}
@@ -20,6 +23,9 @@ library(ggbeeswarm)
 theme_set(cowplot::theme_cowplot())
 ```
 
+Note from Mike:
+I copied this script from Dan's file in initial-analysis-37d, and modified to create an improved figure for the manuscript.
+For that reason, it may be somewhat confusing, and we should revise it for the next manuscript version.
 
 # Ingest data
 
@@ -576,5 +582,3 @@ p2 <- data_amp |>
 
 p1 / p2
 ```
-
-# Hierarchical model with error propagation [TODO]
